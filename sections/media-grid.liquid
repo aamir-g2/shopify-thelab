@@ -7,10 +7,12 @@ CSS
 {%- endcomment -%}
 
 <style>
-  #shopify-section-{{ section.id }} {
-    --media-grid-row-height: {{ section.settings.mobile_row_height }}px;
+  #shopify-section-{{ section.id }} .media-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1rem;
   }
-
+  
   @media screen and (min-width: 700px) {
     #shopify-section-{{ section.id }} {
       --media-grid-row-height: {{ section.settings.desktop_row_height }}px;
