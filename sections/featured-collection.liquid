@@ -1,56 +1,6 @@
 {%- render 'section-spacing-collapsing' -%}
 
 <style>
-  /* Target the section header inside this section only */
-  #shopify-section-{{ section.id }} .section-header {
-    text-align: center; /* Center align the whole header */
-    margin-bottom: 2rem;
-    padding: 1rem 0;
-    background-color: #faf6f0; /* light background */
-    border-bottom: 2px solid #ccc;
-  }
-
-  #shopify-section-{{ section.id }} .section-header__subheading {
-    font-size: 0.875rem;
-    letter-spacing: 0.05em;
-    color: #777;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-
-  #shopify-section-{{ section.id }} .section-header__heading {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #2a2a2a;
-    background: linear-gradient(90deg, #b78a4b, #d4af37);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  #shopify-section-{{ section.id }} .section-header__content {
-    max-width: 600px;
-    margin: 0.5rem auto 0;
-    font-size: 1rem;
-    color: #444;
-  }
-
-  #shopify-section-{{ section.id }} .section-header a {
-    display: inline-block;
-    margin-top: 0.75rem;
-    font-size: 0.9rem;
-    color: #b78a4b;
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    transition: border-color 0.3s ease;
-  }
-
-  #shopify-section-{{ section.id }} .section-header a:hover {
-    border-color: #b78a4b;
-  }
-</style>
-
-
-<style>
   {%- assign section_background = section.settings.background | default: settings.background -%}
   {%- assign card_background = section.settings.product_card_background | default: settings.product_card_background -%}
   {%- assign card_blends = false -%}
