@@ -40,9 +40,9 @@ Order Form Section
 
                 {%- comment -%} cost & rsp normalized to cents {%- endcomment -%}
                 {% if variant.metafields.pricing.cost_price.value %}
-                  {% assign cost_price_cents = variant.metafields.pricing.cost_price.value | times: 100 | round %}
+                  {% assign cost_price_cents = variant.metafields.pricing.cost_price.value | round %}
                 {% elsif product.metafields.pricing.cost_price.value %}
-                  {% assign cost_price_cents = product.metafields.pricing.cost_price.value | times: 100 | round %}
+                  {% assign cost_price_cents = product.metafields.pricing.cost_price.value | round %}
                 {% else %}
                   {% assign cost_price_cents = 0 %}
                 {% endif %}
@@ -191,7 +191,7 @@ Order Form Section
         const costPrice = Number(row.dataset.costPrice || 0); // rands
 
         const totalUnits = boxes * unitsPerBox;
-        const subtotal = totalUnits * costPrice / 100;
+        const subtotal = totalUnits * costPrice;
 
         row.querySelector('.total-units').textContent = totalUnits;
         row.querySelector('.subtotal').textContent = formatMoney(subtotal);
