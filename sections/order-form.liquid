@@ -46,7 +46,7 @@ Order Form Section
                   data-variant-id="{{ variant.id }}"
                   data-units-per-box="{{ units_per_box }}"
                   data-cost-price="{{ cost_price }}"
-                  data-rsp="{{ rsp_price | divided_by: 100.0 }}">
+                  data-rsp="{{ rsp_price }}">
                   <td style="text-align:left;">
                     <div style="display:flex;gap:.5rem;align-items:center;">
                       {% if product.featured_image %}
@@ -110,7 +110,7 @@ Order Form Section
     document.addEventListener('DOMContentLoaded', function() {
       const section = document.getElementById('order-form-{{ section.id }}');
       if (!section) return;
-      
+
       const rows = Array.from(section.querySelectorAll('.order-row'));
       const addBtn = section.querySelector('#of-add-to-cart');
       const clearBtn = section.querySelector('#of-clear');
