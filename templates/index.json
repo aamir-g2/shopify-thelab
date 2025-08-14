@@ -179,6 +179,14 @@
         "background_gradient": ""
       }
     },
+    "order_form_x34XWm": {
+      "type": "order-form",
+      "name": "Order form",
+      "settings": {
+        "heading": "Order Form",
+        "collection": "order-form"
+      }
+    },
     "featured-collection": {
       "type": "featured-collection",
       "settings": {
@@ -773,6 +781,7 @@
   "order": [
     "slideshow",
     "media-grid",
+    "order_form_x34XWm",
     "featured-collection",
     "image-link-blocks",
     "scrolling-text",
