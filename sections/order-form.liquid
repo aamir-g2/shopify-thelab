@@ -225,59 +225,31 @@ Order Form Section
       addBtn?.addEventListener('click', async () => {
         const items = [];
         rows.forEach(row => {
-            const boxes = Number(row.querySelector('.box-input').value || 0);
-            if (boxes > 0) {
+          const boxes = Number(row.querySelector('.box-input').value || 0);
+          if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
             const variantId = Number(row.dataset.variantId);
-            const quantity = boxes * unitsPerBox;
+            const quantity = boxes * unitsPerBox; // send total units
             if (quantity > 0) items.push({ id: variantId, quantity });
-            }
+          }
         });
         if (!items.length) return;
 
         addBtn.disabled = true;
-
-        // 1) Try bulk add
         try {
-            const res = await fetch('/cart/add.js', {
+          const res = await fetch('/cart/add.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ items })
-            });
-
-            if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err?.description || err?.message || 'Cart add failed');
-            }
-
-            // Success → go to cart (or open your drawer)
-            window.location.href = '/cart';
-            return;
+          });
+          if (!res.ok) throw new Error('Cart error');
+          window.location.href = '/cart';
         } catch (e) {
-            console.warn('Bulk add failed:', e?.message);
-            // 2) Fallback: add items one-by-one to identify the failing line
-            try {
-            for (const it of items) {
-                const r = await fetch('/cart/add.js', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(it) // single item form
-                });
-                if (!r.ok) {
-                const je = await r.json().catch(() => ({}));
-                throw new Error(je?.description || je?.message || `Failed on variant ${it.id}`);
-                }
-            }
-            window.location.href = '/cart';
-            return;
-            } catch (e2) {
-            alert(`Sorry, couldn't add item(s): ${e2.message}`);
-            } finally {
-            addBtn.disabled = false;
-            }
+          alert('Sorry, something went wrong adding items to cart.');
+        } finally {
+          addBtn.disabled = false;
         }
-        });
-
+      });
 
       recalcTotals();
     });
