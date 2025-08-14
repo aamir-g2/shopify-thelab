@@ -1,0 +1,217 @@
+{% comment %}
+Order Form Section
+- Lists products from a chosen collection
+- Lets user enter # of boxes
+- Calculates total units & subtotal
+- Adds multiple lines to cart via /cart/add.js
+{% endcomment %}
+
+<section id="order-form-{{ section.id }}" class="order-form">
+  <div class="order-form__inner">
+    {% if section.settings.heading != blank %}
+      <h2>{{ section.settings.heading }}</h2>
+    {% endif %}
+
+    {% assign order_collection = collections[section.settings.collection] %}
+
+    {% if order_collection and order_collection.products_count > 0 %}
+      <div class="order-form__table-wrap">
+        <table class="order-form__table">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Product</th>
+              <th>Variant</th>
+              <th>Units/box</th>
+              <th>Cost</th>
+              <th>RSP</th>
+              <th># Boxes</th>
+              <th>Total units</th>
+              <th>Subtotal</th>
+              <th>Margin %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in order_collection.products %}
+              {% for variant in product.variants %}
+                {% assign units_per_box = variant.metafields.packaging.units_per_box.value 
+                  | default: product.metafields.packaging.units_per_box.value 
+                  | default: 1 %}
+                {% assign cost_price = variant.metafields.pricing.cost_price.value 
+                  | default: product.metafields.pricing.cost_price.value 
+                  | default: 0 %}
+                {% assign rsp_price = variant.metafields.pricing.rsp.value 
+                  | default: variant.price %}
+
+                <tr class="order-row"
+                  data-variant-id="{{ variant.id }}"
+                  data-units-per-box="{{ units_per_box }}"
+                  data-cost-price="{{ cost_price }}"
+                  data-rsp="{{ rsp_price | divided_by: 100.0 }}">
+                  <td style="text-align:left;">
+                    <div style="display:flex;gap:.5rem;align-items:center;">
+                      {% if product.featured_image %}
+                        <img src="{{ product.featured_image | image_url: width: 60 }}" alt="{{ product.title | escape }}" width="40" height="40" loading="lazy" style="border-radius:6px;">
+                      {% endif %}
+                      <a href="{{ product.url }}">{{ product.title }}</a>
+                    </div>
+                  </td>
+                  <td>{{ variant.title }}</td>
+                  <td class="units-per-box">{{ units_per_box }}</td>
+                  <td class="cost-price">{{ cost_price | money }}</td>
+                  <td class="rsp-price">
+                    {% if variant.metafields.pricing.rsp.value %}
+                      {{ variant.metafields.pricing.rsp.value | money }}
+                    {% elsif product.metafields.pricing.rsp.value %}
+                      {{ product.metafields.pricing.rsp.value | money }}
+                    {% else %}
+                      {{ variant.price | money }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input class="box-input" type="number" min="0" step="1" inputmode="numeric" style="width:5rem;">
+                  </td>
+                  <td class="total-units">0</td>
+                  <td class="subtotal">{{ 0 | money }}</td>
+                  <td class="margin">–</td>
+                </tr>
+              {% endfor %}
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="6" style="text-align:right;">Order total:</th>
+              <th id="of-total-units">0</th>
+              <th id="of-grand-subtotal">{{ 0 | money }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="order-form__actions" style="margin-top:1rem; display:flex; gap:.75rem;">
+        <button type="button" class="button" id="of-add-to-cart">Add selected to cart</button>
+        <button type="button" class="button" id="of-clear">Clear</button>
+      </div>
+    {% else %}
+      <p>No products found. Ensure your collection has **Active** products available on the Online Store channel.</p>
+    {% endif %}
+  </div>
+
+  <style>
+    .order-form__table { width:100%; border-collapse: collapse; }
+    .order-form__table th, .order-form__table td { padding:.6rem; border-bottom: 1px solid rgba(0,0,0,.08); text-align:center; }
+    .order-form__table th:first-child, .order-form__table td:first-child { text-align:left; }
+    .order-form__table-wrap { overflow-x:auto; }
+    .button { padding:.6rem 1rem; border:1px solid currentColor; border-radius:.5rem; background:transparent; cursor:pointer; }
+    .button:disabled { opacity:.5; cursor:not-allowed; }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const section = document.getElementById('order-form-{{ section.id }}');
+      if (!section) return;
+
+      const moneyFormat = {{ shop.money_format | json }}; // e.g. "{{amount}}"
+      const rows = Array.from(section.querySelectorAll('.order-row'));
+      const addBtn = section.querySelector('#of-add-to-cart');
+      const clearBtn = section.querySelector('#of-clear');
+      const totalUnitsCell = section.querySelector('#of-total-units');
+      const grandSubtotalCell = section.querySelector('#of-grand-subtotal');
+
+      function formatMoney(number) {
+        // number is in store currency units, not cents
+        // Convert to cents for Shopify-like formatting
+        const cents = Math.round(Number(number || 0) * 100);
+        // Simple formatter for {{amount}} patterns:
+        const amount = (cents / 100).toFixed(2);
+        return moneyFormat.replace('{{ amount }}', amount).replace('{{amount}}', amount);
+      }
+
+      function recalcRow(row) {
+        const boxes = Number(row.querySelector('.box-input').value || 0);
+        const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
+        const costPrice = Number(row.dataset.costPrice || 0); // already currency units
+        const rsp = Number(row.dataset.rsp || 0);             // currency units
+
+        const totalUnits = boxes * unitsPerBox;
+        const subtotal = totalUnits * costPrice;
+        const marginPct = rsp > 0 ? ((rsp - costPrice) / rsp) * 100 : 0;
+
+        row.querySelector('.total-units').textContent = totalUnits;
+        row.querySelector('.subtotal').textContent = formatMoney(subtotal);
+        row.querySelector('.margin').textContent = (rsp > 0 && costPrice > 0)
+          ? `${marginPct.toFixed(0)}%`
+          : '–';
+
+        return { totalUnits, subtotal };
+      }
+
+      function recalcTotals() {
+        let totalUnits = 0;
+        let grandSubtotal = 0;
+        rows.forEach(row => {
+          const { totalUnits: u, subtotal: s } = recalcRow(row);
+          totalUnits += u;
+          grandSubtotal += s;
+        });
+        totalUnitsCell.textContent = totalUnits;
+        grandSubtotalCell.textContent = formatMoney(grandSubtotal);
+        addBtn.disabled = totalUnits === 0;
+      }
+
+      rows.forEach(row => {
+        const input = row.querySelector('.box-input');
+        input.addEventListener('input', recalcTotals, { passive: true });
+      });
+
+      clearBtn?.addEventListener('click', () => {
+        rows.forEach(row => row.querySelector('.box-input').value = '');
+        recalcTotals();
+      });
+
+      addBtn?.addEventListener('click', async () => {
+        const items = [];
+        rows.forEach(row => {
+          const boxes = Number(row.querySelector('.box-input').value || 0);
+          if (boxes > 0) {
+            const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
+            const variantId = Number(row.dataset.variantId);
+            const quantity = boxes * unitsPerBox; // send total UNITS to cart
+            if (quantity > 0) items.push({ id: variantId, quantity });
+          }
+        });
+
+        if (!items.length) return;
+
+        addBtn.disabled = true;
+        try {
+          const res = await fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ items })
+          });
+          if (!res.ok) throw new Error('Cart error');
+          // Optionally open the drawer if your theme supports it:
+          window.location.href = '/cart';
+        } catch (e) {
+          alert('Sorry, something went wrong adding items to cart.');
+        } finally {
+          addBtn.disabled = false;
+        }
+      });
+
+      recalcTotals();
+    });
+  </script>
+</section>
+
+{% schema %}
+{
+  "name": "Order form",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Order Form" },
+    { "type": "collection", "id": "collection", "label": "Collection to show" }
+  ],
+  "presets": [{ "name": "Order form" }]
+}
+{% endschema %}
