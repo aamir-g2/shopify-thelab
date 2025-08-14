@@ -133,7 +133,7 @@ Order Form Section
         const rsp = Number(row.dataset.rsp || 0);             // currency units
 
         const totalUnits = boxes * unitsPerBox;
-        const subtotal = totalUnits * costPrice;
+        const subtotal = totalUnits * costPrice / 100;
         const marginPct = rsp > 0 ? ((rsp - costPrice) / rsp) * 100 : 0;
 
         row.querySelector('.total-units').textContent = totalUnits;
