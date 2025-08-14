@@ -191,7 +191,7 @@ Order Form Section
         const costPrice = Number(row.dataset.costPrice || 0); // rands
 
         const totalUnits = boxes * unitsPerBox;
-        const subtotal = totalUnits * costPrice;
+        const subtotal = totalUnits * costPrice / 100;
 
         row.querySelector('.total-units').textContent = totalUnits;
         row.querySelector('.subtotal').textContent = formatMoney(subtotal);
