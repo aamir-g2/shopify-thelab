@@ -40,9 +40,9 @@ Order Form Section
 
                 {%- comment -%} cost & rsp normalized to cents {%- endcomment -%}
                 {% if variant.metafields.pricing.cost_price.value %}
-                  {% assign cost_price_cents = variant.metafields.pricing.cost_price.value | round %}
+                  {% assign cost_price_cents = variant.metafields.pricing.cost_price.value | times: 100 | round %}
                 {% elsif product.metafields.pricing.cost_price.value %}
-                  {% assign cost_price_cents = product.metafields.pricing.cost_price.value | round %}
+                  {% assign cost_price_cents = product.metafields.pricing.cost_price.value | times: 100 | round %}
                 {% else %}
                   {% assign cost_price_cents = 0 %}
                 {% endif %}
