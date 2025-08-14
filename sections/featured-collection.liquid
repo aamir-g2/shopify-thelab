@@ -24,6 +24,30 @@
     background: none !important;
   }
 
+  /* Items-left progress bar */
+  #shopify-section-{{ section.id }} .items-progress{
+    display:flex; align-items:center; gap:.75rem;
+    margin-top: var(--spacing-4);
+  }
+
+  #shopify-section-{{ section.id }} .items-progress__track{
+    position:relative; flex:1 1 auto; height:6px; border-radius:9999px;
+    background: var(--border-color, rgba(0,0,0,.08));
+    overflow:hidden;
+  }
+
+  #shopify-section-{{ section.id }} .items-progress__bar{
+    position:absolute; inset:0 auto 0 0; width:0%;
+    background: currentColor; /* matches section text color */
+    opacity:.25; border-radius:9999px;
+    transition: width .25s ease;
+  }
+
+  #shopify-section-{{ section.id }} .items-progress__text{
+    font: inherit; opacity:.8; white-space:nowrap;
+  }
+
+
 </style>
 
 
@@ -84,6 +108,19 @@
         </reveal-items>
       </scroll-carousel>
 
+            </scroll-carousel>
+
+      <!-- Items-left progress bar -->
+      <div class="items-progress" id="items-progress-{{ section.id }}" aria-hidden="true">
+        <div class="items-progress__track">
+          <div class="items-progress__bar"></div>
+        </div>
+        <div class="items-progress__text">
+          <span data-left>0</span> left
+        </div>
+      </div>
+
+
       {%- if section.settings.stack_products == false -%}
         {%- if section.settings.show_progress_bar -%}
           {%- assign default_progress = section.settings.products_per_row_desktop | times: 1.0 | divided_by: section.settings.products_count -%}
@@ -103,6 +140,67 @@
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const area = document.getElementById('{{ scroll_area_id }}');
+  const wrap = document.getElementById('items-progress-{{ section.id }}');
+  if (!area || !wrap) return;
+
+  const list = area.querySelector('.product-list');
+  const items = list ? Array.from(list.querySelectorAll('product-card')) : [];
+  const bar = wrap.querySelector('.items-progress__bar');
+  const leftEl = wrap.querySelector('[data-left]');
+
+  // Hide if nothing to scroll
+  function hideIfNotScrollable() {
+    const scrollable = area.scrollWidth > area.clientWidth + 2; // +2 to avoid float rounding
+    wrap.style.display = scrollable ? '' : 'none';
+    return scrollable;
+  }
+
+  function itemsPerRow() {
+    const v = getComputedStyle(list).getPropertyValue('--product-list-items-per-row');
+    const n = parseInt(v, 10);
+    return isNaN(n) ? 1 : n;
+  }
+
+  // Horizontal step size between items (accounts for column gap)
+  function stepSize() {
+    if (items.length < 2) {
+      return items[0]?.getBoundingClientRect().width || area.clientWidth;
+    }
+    // Use left offset difference to include the column gap
+    return items[1].offsetLeft - items[0].offsetLeft || items[0].getBoundingClientRect().width;
+  }
+
+  function update() {
+    if (!hideIfNotScrollable()) return;
+
+    const ipr = itemsPerRow();
+    const step = stepSize();
+
+    // Current first visible index (approx)
+    const idx = Math.round(area.scrollLeft / step);
+
+    const total = items.length;
+    const shown = Math.min(total, idx + ipr);
+    const remaining = Math.max(0, total - shown);
+    const pct = total > 0 ? (shown / total) * 100 : 0;
+
+    bar.style.width = pct + '%';
+    leftEl.textContent = remaining;
+  }
+
+  // Update on scroll & resize
+  area.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+
+  // Initial paint
+  update();
+});
+</script>
+
 
 {% schema %}
 {
