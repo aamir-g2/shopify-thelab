@@ -251,7 +251,11 @@ Order Form Section
             }
 
             // Success → go to cart (or open your drawer)
-            window.location.href = '/cart';
+            // window.location.href = '/cart';
+             // after successful add (instead of redirect)
+            const toggle = document.querySelector('[data-cart-toggle], [aria-controls="CartDrawer"], .header__cart, .js-cart-toggle');
+            if (toggle) toggle.click();
+
             return;
         } catch (e) {
             console.warn('Bulk add failed:', e?.message);
