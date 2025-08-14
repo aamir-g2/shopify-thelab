@@ -110,22 +110,21 @@ Order Form Section
     document.addEventListener('DOMContentLoaded', function() {
       const section = document.getElementById('order-form-{{ section.id }}');
       if (!section) return;
-
-      const moneyFormat = {{ shop.money_format | json }}; // e.g. "{{amount}}"
+      
       const rows = Array.from(section.querySelectorAll('.order-row'));
       const addBtn = section.querySelector('#of-add-to-cart');
       const clearBtn = section.querySelector('#of-clear');
       const totalUnitsCell = section.querySelector('#of-total-units');
       const grandSubtotalCell = section.querySelector('#of-grand-subtotal');
 
-      function formatMoney(number) {
-        // number is in store currency units, not cents
-        // Convert to cents for Shopify-like formatting
-        const cents = Math.round(Number(number || 0) * 100);
-        // Simple formatter for {{amount}} patterns:
-        const amount = (cents / 100).toFixed(2);
-        return moneyFormat.replace('{{ amount }}', amount).replace('{{amount}}', amount);
-      }
+      function formatMoney(amount) {
+        // amount is in Rands (not cents)
+        return new Intl.NumberFormat('en-ZA', {
+            style: 'currency',
+            currency: 'ZAR'
+        }).format(amount);
+    }
+
 
       function recalcRow(row) {
         const boxes = Number(row.querySelector('.box-input').value || 0);
