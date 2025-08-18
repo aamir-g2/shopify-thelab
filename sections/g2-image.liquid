@@ -1,0 +1,345 @@
+{% comment %}
+Combined: Impact Text + Image with Text Overlay
+Requires snippets used by original sections:
+- 'section-spacing-collapsing', 'section-properties', 'surface', 'styled-text', 'button'
+Custom elements used: <impact-text>, <image-banner>
+{% endcomment %}
+
+{%- render 'section-spacing-collapsing' -%}
+
+<style>
+  /* Impact Text responsive vars */
+  #shopify-section-{{ section.id }} {
+    --impact-text-font-size: calc(min(20vw, 65px) * {{ section.settings.impact_text_size_ratio }});
+    --impact-text-auto-columns: {% if section.blocks.size == 0 %}minmax(0,1fr){% else %}{% if section.settings.impact_text_divider != 'none' %}48vw auto{% else %}64vw{% endif %}{% endif %};
+  }
+  @media (min-width:700px) {
+    #shopify-section-{{ section.id }} {
+      --impact-text-font-size: calc(min(15vw, var(--container-max-width) * 0.15) / max({{ section.settings.impact_columns }},1) * {{ section.settings.impact_text_size_ratio }});
+      --impact-text-auto-columns: {% if section.settings.impact_text_divider != 'none' %}minmax(0, 1fr) auto{% else %}minmax(0, 1fr){% endif %};
+    }
+  }
+
+  /* Overlay color variable */
+  #shopify-section-{{ section.id }} {
+    --content-over-media-overlay: {{ section.settings.overlay_color.rgb }} / {{ section.settings.overlay_opacity | divided_by: 100.0 }};
+    {%- if section.settings.overlay_allow_transparent_header -%}
+      margin-block-start: calc(-1 * var(--header-height) * var(--section-is-first));
+    {%- endif -%}
+    {%- if section.settings.overlay_full_width -%}
+      --section-outer-spacing-block: 0;
+    {%- endif -%}
+  }
+</style>
+
+<div {% render 'section-properties' %} {% if section.settings.overlay_allow_transparent_header %}allow-transparent-header{% endif %}>
+
+  {%- if section.settings.show_impact -%}
+  <!-- Impact Text Area -->
+  <div class="{% unless section.settings.impact_stack_mobile %}scroll-area bleed {% if section.settings.impact_columns < 3 %}sm:unbleed{% else %}md:unbleed{% endif %}{% endunless %}">
+    <div class="impact-text impact-text--{{ section.settings.impact_text_alignment }} {% unless section.settings.impact_stack_mobile %}impact-text--scroll{% endunless %}">
+      {%- assign impact_count = 0 -%}
+      {%- for block in section.blocks -%}
+        {%- if block.type == 'impact_item' -%}
+          {%- assign impact_count = impact_count | plus: 1 -%}
+          <div class="snap-center" {{ block.shopify_attributes }}>
+            {%- if block.settings.title != blank -%}
+              <h2 class="impact-text__text heading break-all">
+                <impact-text {% if block.settings.animate_impact_text %}count-up="{{ block.settings.animate_impact_text_duration }}"{% endif %} reveal-js>
+                  {%- render 'styled-text',
+                    content: block.settings.title,
+                    text_color: section.settings.impact_heading_text_color,
+                    gradient: section.settings.impact_heading_gradient,
+                    style: section.settings.impact_text_style
+                  -%}
+                </impact-text>
+              </h2>
+            {%- endif -%}
+
+            {%- if block.settings.subheading != blank or block.settings.content != blank or block.settings.button_text != blank -%}
+              <div class="impact-text__content">
+                <div class="prose">
+                  {%- if block.settings.subheading != blank -%}
+                    <h3 class="h4">{{ block.settings.subheading | escape }}</h3>
+                  {%- endif -%}
+                  {{- block.settings.content -}}
+                  {%- if block.settings.button_text != blank -%}
+                    {%- render 'button',
+                      content: block.settings.button_text,
+                      href: block.settings.button_url,
+                      size: 'xl',
+                      background: section.settings.impact_button_background,
+                      text_color: section.settings.impact_button_text_color
+                    -%}
+                  {%- endif -%}
+                </div>
+              </div>
+            {%- endif -%}
+          </div>
+
+          {%- comment -%} Divider between impact items {%- endcomment -%}
+          {%- if section.settings.impact_text_divider != 'none' -%}
+            {%- assign next_is_impact = false -%}
+            {%- for peek in section.blocks offset:forloop.index -%}
+              {%- if peek.type == 'impact_item' -%}{%- assign next_is_impact = true -%}{%- break -%}{%- endif -%}
+            {%- endfor -%}
+            {%- if next_is_impact -%}
+              {%- case section.settings.impact_text_divider -%}
+                {%- when 'square' -%}<span class="shape-square shape--lg place-self-center"></span>
+                {%- when 'circle' -%}<span class="shape-circle shape--lg place-self-center"></span>
+                {%- when 'diamond' -%}<span class="shape-diamond shape--lg place-self-center"></span>
+                {%- when 'line' -%}<span class="shape-line {% if section.settings.impact_stack_mobile %}hidden sm:block{% endif %}"></span>
+              {%- endcase -%}
+            {%- endif -%}
+          {%- endif -%}
+
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+  </div>
+  {%- endif -%}
+
+  {%- if section.settings.show_overlay -%}
+  <!-- Image with Text Overlay Area -->
+  {%- capture overlay_class -%}
+    content-over-media content-over-media--{{ section.settings.overlay_image_size }}
+    {% if section.settings.overlay_full_width %}full-bleed{% else %}shadow-block rounded-lg{% endif %}
+  {%- endcapture -%}
+
+  <image-banner reveal-on-scroll="true" {% if section.settings.overlay_enable_parallax %}parallax="0.3"{% endif %} {% render 'surface', class: overlay_class, text_color: section.settings.overlay_text_color %}>
+    {%- if section.settings.overlay_image != blank -%}
+      {%- capture sizes -%}{% if section.settings.overlay_full_width %}100vw{% else %}(max-width: 740px) calc(100vw - 40px), (max-width: 999px) calc(100vw - 64px), min({{ settings.page_width }}px, 100vw - 96px){% endif %}{%- endcapture -%}
+      {%- capture fetch_priority -%}{% if section.index == 1 %}high{% else %}low{% endif %}{%- endcapture -%}
+      <picture>
+        {%- if section.settings.overlay_mobile_image != blank -%}
+          <source
+            media="(max-width: 699px)"
+            srcset="{{ section.settings.overlay_mobile_image | image_url: width: 400 }} 400w, {{ section.settings.overlay_mobile_image | image_url: width: 600 }} 600w, {{ section.settings.overlay_mobile_image | image_url: width: 800 }} 800w, {{ section.settings.overlay_mobile_image | image_url: width: 1000 }} 1000w, {{ section.settings.overlay_mobile_image | image_url: width: 1200 }} 1200w"
+            width="{{ section.settings.overlay_mobile_image.width }}"
+            height="{{ section.settings.overlay_mobile_image.height }}"
+          >
+        {%- endif -%}
+        {{- section.settings.overlay_image
+           | image_url: width: section.settings.overlay_image.width
+           | image_tag: sizes: sizes, fetchpriority: fetch_priority, widths: '200,300,400,500,600,700,800,900,1000,1200,1400,1600,1800,2000,2200,2400,2600,2800,3000,3200' -}}
+      </picture>
+    {%- else -%}
+      {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder' | replace: '<svg', '<svg preserveAspectRatio="xMinYMin slice"' }}
+    {%- endif -%}
+
+    <div class="{{ section.settings.overlay_mobile_text_position }} {{ section.settings.overlay_desktop_text_position }}">
+      <div class="prose">
+        {%- for block in section.blocks -%}
+          {%- case block.type -%}
+            {%- when 'overlay_subheading' -%}
+              {%- if block.settings.text != blank -%}
+                <p class="bold" {{ block.shopify_attributes }}>{{ block.settings.text | escape }}</p>
+              {%- endif -%}
+
+            {%- when 'overlay_heading' -%}
+              {%- if block.settings.text != blank -%}
+                <p class="{{ block.settings.heading_tag }}" {% if settings.heading_apparition != 'none' %}reveal-on-scroll="true"{% endif %} {{ block.shopify_attributes }}>
+                  {%- render 'styled-text', content: block.settings.text, apparition_effect: true -%}
+                </p>
+              {%- endif -%}
+
+            {%- when 'overlay_richtext' -%}
+              {%- if block.settings.content != blank -%}
+                <div {{ block.shopify_attributes }}>{{- block.settings.content -}}</div>
+              {%- endif -%}
+
+            {%- when 'overlay_liquid' -%}
+              {%- if block.settings.liquid != blank -%}
+                <div {{ block.shopify_attributes }}>{{- block.settings.liquid -}}</div>
+              {%- endif -%}
+
+            {%- when 'overlay_button' -%}
+              {%- if block.settings.text != blank -%}
+                {% render 'button',
+                  content: block.settings.text,
+                  href: block.settings.url,
+                  size: block.settings.size,
+                  style: block.settings.style,
+                  background: block.settings.background,
+                  text_color: block.settings.text_color,
+                  block: block
+                %}
+              {%- endif -%}
+          {%- endcase -%}
+        {%- endfor -%}
+      </div>
+    </div>
+  </image-banner>
+  {%- endif -%}
+
+</div>
+
+{% schema %}
+{
+  "name": "Impact + Image Overlay",
+  "class": "shopify-section--impact-and-overlay",
+  "tag": "section",
+  "disabled_on": { "templates": ["password"], "groups": ["header", "custom.overlay"] },
+
+  "settings": [
+    { "type": "header", "content": "Toggles" },
+    { "type": "checkbox", "id": "show_impact", "label": "Show Impact Text area", "default": true },
+    { "type": "checkbox", "id": "show_overlay", "label": "Show Image with Text Overlay area", "default": true },
+
+    { "type": "header", "content": "Impact Text — Layout" },
+    { "type": "checkbox", "id": "impact_stack_mobile", "label": "Stack impact items on mobile", "default": true },
+    { "type": "range", "id": "impact_columns", "label": "Visual columns (for sizing calc only)", "min": 1, "max": 3, "step": 1, "default": 2 },
+    {
+      "type": "select", "id": "impact_text_alignment", "label": "Impact text alignment",
+      "options": [
+        { "value": "start", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "end", "label": "Right" }
+      ], "default": "center"
+    },
+    {
+      "type": "select", "id": "impact_text_style", "label": "Impact text style",
+      "options": [ { "value": "outline", "label": "Outline" }, { "value": "fill", "label": "Fill" } ],
+      "default": "fill"
+    },
+    {
+      "type": "select", "id": "impact_text_divider", "label": "Divider between impact items",
+      "options": [
+        { "value": "none", "label": "None" },
+        { "value": "square", "label": "Square" },
+        { "value": "circle", "label": "Circle" },
+        { "value": "diamond", "label": "Diamond" },
+        { "value": "line", "label": "Line" }
+      ],
+      "default": "none"
+    },
+    { "type": "range", "id": "impact_text_size_ratio", "label": "Impact text size ratio", "min": 0.5, "max": 1.5, "step": 0.1, "default": 1 },
+
+    { "type": "header", "content": "Impact Text — Colors" },
+    { "type": "color", "id": "impact_heading_text_color", "label": "Impact text", "default": "#111111" },
+    { "type": "color_background", "id": "impact_heading_gradient", "label": "Impact text gradient" },
+    { "type": "color", "id": "impact_button_background", "label": "Button background" },
+    { "type": "color", "id": "impact_button_text_color", "label": "Button text" },
+
+    { "type": "header", "content": "Overlay — Layout" },
+    { "type": "checkbox", "id": "overlay_full_width", "label": "Full width image", "default": true },
+    { "type": "checkbox", "id": "overlay_allow_transparent_header", "label": "Allow transparent header (only if first section)", "default": false },
+    { "type": "checkbox", "id": "overlay_enable_parallax", "label": "Enable parallax (crops images)", "default": false },
+    {
+      "type": "select", "id": "overlay_image_size", "label": "Image size",
+      "options": [
+        { "value": "auto", "label": "Original image ratio" },
+        { "value": "sm", "label": "Small" },
+        { "value": "md", "label": "Medium" },
+        { "value": "lg", "label": "Large" },
+        { "value": "fill", "label": "Fill screen" }
+      ],
+      "default": "auto"
+    },
+    { "type": "image_picker", "id": "overlay_image", "label": "Image" },
+    { "type": "image_picker", "id": "overlay_mobile_image", "label": "Mobile image" },
+
+    { "type": "header", "content": "Overlay — Positions & Colors" },
+    {
+      "type": "select", "id": "overlay_mobile_text_position", "label": "Mobile content position",
+      "options": [
+        { "value": "place-self-start text-start", "label": "Top left" },
+        { "value": "place-self-start-center text-center", "label": "Top center" },
+        { "value": "place-self-start-end text-end", "label": "Top right" },
+        { "value": "place-self-center-start text-start", "label": "Middle left" },
+        { "value": "place-self-center text-center", "label": "Middle center" },
+        { "value": "place-self-center-end text-end", "label": "Middle right" },
+        { "value": "place-self-end-start text-start", "label": "Bottom left" },
+        { "value": "place-self-end-center text-center", "label": "Bottom center" },
+        { "value": "place-self-end text-end", "label": "Bottom right" }
+      ],
+      "default": "place-self-center text-center"
+    },
+    {
+      "type": "select", "id": "overlay_desktop_text_position", "label": "Desktop content position",
+      "options": [
+        { "value": "sm:place-self-start sm:text-start", "label": "Top left" },
+        { "value": "sm:place-self-start-center sm:text-center", "label": "Top center" },
+        { "value": "sm:place-self-start-end sm:text-end", "label": "Top right" },
+        { "value": "sm:place-self-center-start sm:text-start", "label": "Middle left" },
+        { "value": "sm:place-self-center sm:text-center", "label": "Middle center" },
+        { "value": "sm:place-self-center-end sm:text-end", "label": "Middle right" },
+        { "value": "sm:place-self-end-start sm:text-start", "label": "Bottom left" },
+        { "value": "sm:place-self-end-center sm:text-center", "label": "Bottom center" },
+        { "value": "sm:place-self-end sm:text-end", "label": "Bottom right" }
+      ],
+      "default": "sm:place-self-center sm:text-center"
+    },
+    { "type": "color", "id": "overlay_text_color", "label": "Text color", "default": "#ffffff" },
+    { "type": "color", "id": "overlay_color", "label": "Overlay color", "default": "#000000" },
+    { "type": "range", "id": "overlay_opacity", "label": "Overlay opacity", "min": 0, "max": 100, "step": 1, "unit": "%", "default": 30 }
+  ],
+
+  "blocks": [
+    {
+      "type": "impact_item",
+      "name": "Impact item",
+      "settings": [
+        { "type": "text", "id": "title", "label": "Impact text", "default": "100%" },
+        { "type": "text", "id": "subheading", "label": "Subheading", "default": "Showcase a benefit" },
+        { "type": "richtext", "id": "content", "label": "Content" },
+        { "type": "text", "id": "button_text", "label": "Button text" },
+        { "type": "url", "id": "button_url", "label": "Button link" },
+        { "type": "header", "content": "Number animation" },
+        { "type": "paragraph", "content": "Only numbers animate. Dots/commas/spaces allowed." },
+        { "type": "checkbox", "id": "animate_impact_text", "label": "Count-up animation", "default": false },
+        { "type": "range", "id": "animate_impact_text_duration", "label": "Duration", "min": 0.5, "max": 5, "step": 0.1, "unit": "s", "default": 2 }
+      ]
+    },
+
+    { "type": "overlay_subheading", "name": "Overlay • Subheading", "settings": [ { "type": "text", "id": "text", "label": "Text", "default": "Subheading" } ] },
+    {
+      "type": "overlay_heading",
+      "name": "Overlay • Heading",
+      "settings": [
+        { "type": "text", "id": "text", "label": "Text", "default": "Heading" },
+        {
+          "type": "select", "id": "heading_tag", "label": "Style",
+          "options": [
+            { "value": "h0", "label": "XX-Large" },
+            { "value": "h1", "label": "X-Large" },
+            { "value": "h2", "label": "Large" },
+            { "value": "h3", "label": "Medium" },
+            { "value": "h4", "label": "Small" },
+            { "value": "h5", "label": "X-Small" },
+            { "value": "h6", "label": "XX-Small" }
+          ],
+          "default": "h1"
+        }
+      ]
+    },
+    { "type": "overlay_richtext", "name": "Overlay • Paragraph", "settings": [ { "type": "richtext", "id": "content", "label": "Content", "default": "<p>Share brand info, product details, announcements, etc.</p>" } ] },
+    { "type": "overlay_liquid", "name": "Overlay • Liquid", "settings": [ { "type": "liquid", "id": "liquid", "label": "Liquid", "default": "<p>Custom Liquid for widgets/dynamic code.</p>" } ] },
+    {
+      "type": "overlay_button",
+      "name": "Overlay • Button",
+      "settings": [
+        { "type": "select", "id": "style", "label": "Style", "options": [ { "value": "outline", "label": "Outline" }, { "value": "fill", "label": "Fill" } ], "default": "fill" },
+        { "type": "select", "id": "size", "label": "Size", "options": [ { "value": "sm", "label": "Small" }, { "value": "base", "label": "Medium" }, { "value": "lg", "label": "Large" }, { "value": "xl", "label": "X-Large" } ], "default": "lg" },
+        { "type": "text", "id": "text", "label": "Text", "default": "Button text" },
+        { "type": "url", "id": "url", "label": "Link" },
+        { "type": "color", "id": "background", "label": "Background" },
+        { "type": "color", "id": "text_color", "label": "Text" }
+      ]
+    }
+  ],
+
+  "presets": [
+    {
+      "name": "Impact + Image Overlay",
+      "blocks": [
+        { "type": "impact_item" },
+        { "type": "overlay_subheading" },
+        { "type": "overlay_heading" },
+        { "type": "overlay_richtext" },
+        { "type": "overlay_button" }
+      ]
+    }
+  ]
+}
+{% endschema %}
