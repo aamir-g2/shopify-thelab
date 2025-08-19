@@ -336,7 +336,17 @@ Order Form Section
   "settings": [
     { "type": "text", "id": "heading", "label": "Heading", "default": "Order Form" },
     { "type": "collection", "id": "collection", "label": "Collection to show" },
-    { "type": "text", "id": "wholesale_group", "label": "Wholesale group letter (A/B/C...)", "default": "A", "info": "Filters variants by SKU prefix WS-<GROUP>_ (e.g. WS-A_). Only matching variants appear." },
+    {
+      "type": "select",
+      "id": "wholesale_group",
+      "label": "Wholesale group",
+      "options": [
+        { "value": "A", "label": "A" },
+        { "value": "B", "label": "B" }
+      ],
+      "default": "A",
+      "info": "Filters variants by SKU prefix WS-<GROUP>_ (e.g. WS-A_)."
+    },
     { "type": "range", "id": "pad_block", "min": 0, "max": 80, "step": 4, "unit": "px", "label": "Top/bottom padding", "default": 40 }
   ],
   "presets": [{ "name": "Order form" }]
