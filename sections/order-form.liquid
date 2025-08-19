@@ -253,7 +253,7 @@ Order Form Section
           const boxes = Number(row.querySelector('.box-input').value || 0);
           if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-            const variantId = Number(row.dataset.variantId);
+            const variantId = row.dataset.variantId;
             const quantity = boxes * unitsPerBox;
             if (quantity > 0) items.push({ id: variantId, quantity });
           }
