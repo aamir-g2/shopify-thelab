@@ -20,14 +20,12 @@ Order Form Section
           <thead>
             <tr>
               <th class="of-left">Product</th>
-              <!-- Variant removed -->
               <th>Units/box</th>
-              <th>Cost</th>
-              <th>RSP</th>
+              <th>Price (ex VAT)</th>
+              <th>Price (incl. VAT)</th>
               <th># Boxes</th>
               <th>Total units</th>
               <th>Subtotal</th>
-              <!-- Margin removed -->
             </tr>
           </thead>
           <tbody>
@@ -55,6 +53,19 @@ Order Form Section
                   {% assign rsp_cents = variant.price %}
                 {% endif %}
 
+                {%- comment -%}
+                  Compute ex/incl VAT cents.
+                  If your shop prices include tax, ex VAT = rsp / 1.15, incl VAT = rsp
+                  If not, ex VAT = rsp, incl VAT = rsp * 1.15
+                {%- endcomment -%}
+                {% if shop.taxes_included %}
+                  {% assign rsp_ex_cents = rsp_cents | divided_by: 1.15 | round %}
+                  {% assign rsp_inc_cents = rsp_cents %}
+                {% else %}
+                  {% assign rsp_ex_cents = rsp_cents %}
+                  {% assign rsp_inc_cents = rsp_cents | times: 1.15 | round %}
+                {% endif %}
+
                 <tr class="order-row"
                   data-variant-id="{{ variant.id }}"
                   data-units-per-box="{{ units_per_box }}"
@@ -63,25 +74,32 @@ Order Form Section
                   <td class="of-left">
                     <div class="of-product">
                       {% if product.featured_image %}
-                        <img src="{{ product.featured_image | image_url: width: 64 }}" alt="{{ product.title | escape }}" width="48" height="48" loading="lazy">
+                        <img src="{{ product.featured_image | image_url: width: 96 }}" alt="{{ product.title | escape }}" width="48" height="48" loading="lazy">
                       {% endif %}
-                      <a href="{{ product.url }}" class="of-link">{{ product.title }}</a>
+                      <div class="of-product-meta">
+                        <a href="{{ product.url }}" class="of-link of-name">{{ product.title }}</a>
+                        <div class="of-sku">
+                          {% if variant.sku != blank %}
+                            SKU: {{ variant.sku }}
+                          {% else %}
+                            <span class="of-sku--muted">No SKU</span>
+                          {% endif %}
+                        </div>
+                      </div>
                     </div>
                   </td>
 
-                  <!-- Variant column removed -->
-
                   <td class="units-per-box">{{ units_per_box }}</td>
-                  <td class="cost-price">{{ cost_price_cents | money }}</td>
-                  <td class="rsp-price">{{ rsp_cents | money }}</td>
+
+                  <td class="price-ex-vat">{{ rsp_ex_cents | money }}</td>
+
+                  <td class="price-inc-vat">{{ rsp_inc_cents | money }}</td>
 
                   <td>
                     <input class="box-input" type="number" min="0" step="1" inputmode="numeric" aria-label="Boxes for {{ product.title }}" />
                   </td>
                   <td class="total-units">0</td>
                   <td class="subtotal">{{ 0 | money }}</td>
-
-                  <!-- Margin cell removed -->
                 </tr>
               {% endfor %}
             {% endfor %}
@@ -129,11 +147,17 @@ Order Form Section
     .order-form__table tfoot th#of-total-units,
     .order-form__table tfoot th#of-grand-subtotal { text-align: center; }
 
-    /* product cell */
-    .of-product { display: inline-flex; align-items: center; gap: .6rem; }
-    .of-product img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
-    .of-link { text-decoration: none; border-bottom: 1px solid transparent; }
-    .of-link:hover { border-color: currentColor; }
+    /* product cell enhancements */
+    .of-product { display: inline-flex; align-items: center; gap: .75rem; }
+    .of-product img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex: 0 0 48px; }
+    .of-product-meta { display: grid; line-height: 1.15; text-align: left; }
+    .of-name { font-weight: 700; text-decoration: none; border-bottom: 1px solid transparent; }
+    .of-name:hover { border-color: currentColor; }
+    .of-sku { font-size: .85em; opacity: .7; }
+    .of-sku--muted { opacity: .5; }
+
+    /* keep numeric columns tidy */
+    .price-ex-vat, .price-inc-vat, .units-per-box, .total-units, .subtotal { white-space: nowrap; }
 
     /* inputs */
     .box-input {
@@ -188,7 +212,7 @@ Order Form Section
       function recalcRow(row) {
         const boxes = Number(row.querySelector('.box-input').value || 0);
         const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-        const costPrice = Number(row.dataset.costPrice || 0); // rands
+        const costPrice = Number(row.dataset.costPrice || 0); // cents
 
         const totalUnits = boxes * unitsPerBox;
         const subtotal = totalUnits * costPrice / 100;
@@ -225,13 +249,13 @@ Order Form Section
       addBtn?.addEventListener('click', async () => {
         const items = [];
         rows.forEach(row => {
-            const boxes = Number(row.querySelector('.box-input').value || 0);
-            if (boxes > 0) {
+          const boxes = Number(row.querySelector('.box-input').value || 0);
+          if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
             const variantId = Number(row.dataset.variantId);
             const quantity = boxes * unitsPerBox;
             if (quantity > 0) items.push({ id: variantId, quantity });
-            }
+          }
         });
         if (!items.length) return;
 
@@ -239,45 +263,44 @@ Order Form Section
 
         // 1) Try bulk add
         try {
-            const res = await fetch('/cart/add.js', {
+          const res = await fetch('/cart/add.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ items })
-            });
+          });
 
-            if (!res.ok) {
+          if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err?.description || err?.message || 'Cart add failed');
-            }
+          }
 
-            // Success → go to cart (or open your drawer)
-            window.location.href = '/cart';
-            return;
+          // Success → go to cart (or open your drawer)
+          window.location.href = '/cart';
+          return;
         } catch (e) {
-            console.warn('Bulk add failed:', e?.message);
-            // 2) Fallback: add items one-by-one to identify the failing line
-            try {
+          console.warn('Bulk add failed:', e?.message);
+          // 2) Fallback: add items one-by-one to identify the failing line
+          try {
             for (const it of items) {
-                const r = await fetch('/cart/add.js', {
+              const r = await fetch('/cart/add.js', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify(it) // single item form
-                });
-                if (!r.ok) {
+              });
+              if (!r.ok) {
                 const je = await r.json().catch(() => ({}));
                 throw new Error(je?.description || je?.message || `Failed on variant ${it.id}`);
-                }
+              }
             }
             window.location.href = '/cart';
             return;
-            } catch (e2) {
+          } catch (e2) {
             alert(`Sorry, couldn't add item(s): ${e2.message}`);
-            } finally {
+          } finally {
             addBtn.disabled = false;
-            }
+          }
         }
-        });
-
+      });
 
       recalcTotals();
     });
@@ -295,4 +318,3 @@ Order Form Section
   "presets": [{ "name": "Order form" }]
 }
 {% endschema %}
-
