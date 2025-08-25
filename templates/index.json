@@ -207,7 +207,7 @@
       "settings": {
         "heading": "Order Form",
         "collection": "order-form",
-        "default_sku_prefix": "WS-A_",
+        "default_sku_prefix": "WS-B_",
         "default_label": "Default",
         "show_active_group": true,
         "pad_block": 40
