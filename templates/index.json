@@ -181,10 +181,36 @@
     },
     "order_form_x34XWm": {
       "type": "order-form",
+      "blocks": {
+        "group_map_WGpcx4": {
+          "type": "group_map",
+          "settings": {
+            "customer_tag": "G2Design",
+            "sku_prefix": "G2_",
+            "display_label": "G2Design"
+          }
+        },
+        "group_map_izP3AQ": {
+          "type": "group_map",
+          "settings": {
+            "customer_tag": "Group A",
+            "sku_prefix": "WS-A_",
+            "display_label": "Test Group 1"
+          }
+        }
+      },
+      "block_order": [
+        "group_map_WGpcx4",
+        "group_map_izP3AQ"
+      ],
       "name": "Order form",
       "settings": {
         "heading": "Order Form",
-        "collection": "order-form"
+        "collection": "order-form",
+        "default_sku_prefix": "WS-A_",
+        "default_label": "Default",
+        "show_active_group": true,
+        "pad_block": 40
       }
     },
     "featured-collection": {
