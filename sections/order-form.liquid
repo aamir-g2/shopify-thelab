@@ -421,6 +421,24 @@ Order Form Section
         } finally {
           submitBtn.disabled = false;
         }
+
+        // After creating the draft order:
+        await fetch(`https://${SHOPIFY_SHOP}/admin/api/${LATEST_API_VERSION}/draft_orders/${draft.id}/send_invoice.json`, {
+          method: 'POST',
+          headers: {
+            'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            draft_order_invoice: {
+              to: customer_context.email,
+              bcc: 'aamir@g2design.co.za',
+              subject: `Order request ${draft.name}`,
+              custom_message: `Thanks, we’ve received your order request. Reference: ${draft.name}`
+            }
+          })
+        });
+
       });
 
       recalcTotals();
