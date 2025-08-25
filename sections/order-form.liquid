@@ -252,6 +252,31 @@ Order Form Section
     .of-btn--ghost:hover { background: color-mix(in oklab, currentColor 8%, transparent); }
     .of-btn:disabled { opacity: .5; cursor: not-allowed; }
     .of-empty { opacity: .7; }
+    /* modal */
+    .of-modal[hidden]{display:none}
+    .of-modal{position:fixed;inset:0;z-index:9999}
+    .of-modal__backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4)}
+    .of-modal__dialog{
+      position:relative; margin:6vh auto 0; max-width:720px; background:#fff; border-radius:16px;
+      padding:1.25rem; box-shadow:0 10px 30px rgba(0,0,0,.2)
+    }
+    .of-modal__title{margin:0 0 .75rem 0}
+    .of-modal__close{position:absolute; right:.5rem; top:.5rem; background:transparent; border:0; font-size:1.5rem; cursor:pointer}
+    .of-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem}
+    .of-field{display:flex; flex-direction:column; gap:.35rem}
+    .of-field--full{grid-column:1 / -1}
+    .of-field input,.of-field textarea{
+      border:1px solid rgba(0,0,0,.15); border-radius:8px; padding:.55rem .6rem
+    }
+    .of-modal__actions{display:flex; gap:.5rem; margin-top:.5rem}
+    .of-help{opacity:.7; font-size:.9em; margin-top:.5rem}
+    @media (max-width:720px){ .of-grid{grid-template-columns:1fr} }
+    .of-toast{
+      position:fixed; left:50%; transform:translateX(-50%);
+      bottom:16px; background:#111;color:#fff; padding:.6rem .9rem; border-radius:999px;
+      font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.25); z-index:10000
+    }
+
   </style>
 
   <script>
@@ -259,118 +284,200 @@ Order Form Section
       const section = document.getElementById('order-form-{{ section.id }}');
       if (!section) return;
 
-      // Money formatter (ZAR)
-      function formatMoney(amount) {
-        try {
-          return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' })
-            .format(Number(amount || 0));
-        } catch {
-          return 'R ' + (Number(amount || 0)).toFixed(2);
-        }
+      // Money (ZAR)
+      function formatMoney(amount){
+        try { return new Intl.NumberFormat('en-ZA', {style:'currency', currency:'ZAR'}).format(Number(amount||0)); }
+        catch { return 'R ' + (Number(amount||0)).toFixed(2); }
       }
 
+      // --- table calc (ex-VAT totals, as discussed) ---
       const rows = Array.from(section.querySelectorAll('.order-row'));
-      const addBtn = section.querySelector('#of-add-to-cart');
+      const requestBtn = section.querySelector('#of-request-quote');
       const clearBtn = section.querySelector('#of-clear');
       const totalUnitsCell = section.querySelector('#of-total-units');
       const grandSubtotalCell = section.querySelector('#of-grand-subtotal');
 
-      function recalcRow(row) {
+      function recalcRow(row){
         const boxes = Number(row.querySelector('.box-input').value || 0);
         const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-        const unitPriceCents = Number(row.dataset.unitPriceCents || 0); // cents (RSP incl. VAT)
-
+        const unitPriceCents = Number(row.dataset.unitPriceCents || 0); // ex-VAT cents
         const totalUnits = boxes * unitsPerBox;
         const subtotal = (totalUnits * unitPriceCents) / 100;
-
         row.querySelector('.total-units').textContent = totalUnits;
         row.querySelector('.subtotal').textContent = formatMoney(subtotal);
-
         return { totalUnits, subtotal };
       }
 
-
-      function recalcTotals() {
-        let totalUnits = 0;
-        let grandSubtotal = 0;
+      function recalcTotals(){
+        let totalUnits = 0, grandSubtotal = 0;
         rows.forEach(row => {
           const { totalUnits: u, subtotal: s } = recalcRow(row);
-          totalUnits += u;
-          grandSubtotal += s;
+          totalUnits += u; grandSubtotal += s;
         });
         totalUnitsCell.textContent = totalUnits;
         grandSubtotalCell.textContent = formatMoney(grandSubtotal);
-        addBtn.disabled = totalUnits === 0;
+        requestBtn.disabled = totalUnits === 0;
       }
 
-      rows.forEach(row => {
-        const input = row.querySelector('.box-input');
-        input.addEventListener('input', recalcTotals, { passive: true });
-      });
+      rows.forEach(row => row.querySelector('.box-input').addEventListener('input', recalcTotals, {passive:true}));
+      clearBtn?.addEventListener('click', () => { rows.forEach(r => r.querySelector('.box-input').value=''); recalcTotals(); });
 
-      clearBtn?.addEventListener('click', () => {
-        rows.forEach(row => row.querySelector('.box-input').value = '');
-        recalcTotals();
-      });
+      // --- modal + submit to App Proxy ---
+      const modal = document.getElementById('of-modal');
+      const form = document.getElementById('of-request-form');
+      const modalClose = modal.querySelector('.of-modal__close');
+      const modalCancel = modal.querySelector('.of-cancel');
+      function openModal(){ modal.removeAttribute('hidden'); }
+      function closeModal(){ modal.setAttribute('hidden',''); }
+      modalClose.addEventListener('click', closeModal);
+      modalCancel.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e)=>{ if(e.target.classList.contains('of-modal__backdrop')) closeModal(); });
 
-      addBtn?.addEventListener('click', async () => {
+      function toast(msg, ok=true){
+        const el = document.createElement('div');
+        el.className = 'of-toast';
+        el.style.background = ok ? '#111' : '#b00020';
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(()=>{ el.remove(); }, 3500);
+      }
+
+      function collectItems(){
         const items = [];
         rows.forEach(row => {
           const boxes = Number(row.querySelector('.box-input').value || 0);
           if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-            const variantId = row.dataset.variantId; // string; set via Liquid | json
-            const quantity = boxes * unitsPerBox;
-            if (quantity > 0) items.push({ id: variantId, quantity });
+            const variantId = row.dataset.variantId;
+            const qty = boxes * unitsPerBox;
+            const skuCell = row.querySelector('.of-sku');
+            const title = row.querySelector('.of-name')?.textContent?.trim() || '';
+            const sku = skuCell ? skuCell.textContent.replace(/^SKU:\s*/,'').trim() : '';
+            items.push({ variant_id: variantId, quantity: qty, title, sku });
           }
         });
-        if (!items.length) return;
+        return items;
+      }
 
-        addBtn.disabled = true;
+      requestBtn?.addEventListener('click', () => {
+        if (requestBtn.disabled) return;
+        const items = collectItems();
+        if (!items.length) { toast('Add at least one box.', false); return; }
+        openModal();
+      });
 
-        // 1) Try bulk add
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const items = collectItems();
+        if (!items.length) { toast('No items selected.', false); return; }
+
+        const fd = new FormData(form);
+        const payload = {
+          items,
+          totals: {
+            total_units: Number(totalUnitsCell.textContent || 0),
+            subtotal_ex_vat: grandSubtotalCell.textContent // display only
+          },
+          customer_context: {
+            id: {{ customer.id | default: 'null' }},
+            email: fd.get('email'),
+            name: fd.get('name'),
+            company: fd.get('company'),
+            phone: fd.get('phone')
+          },
+          notes: fd.get('notes') || '',
+          section_id: '{{ section.id }}',
+          source_url: window.location.href
+        };
+
+        // Disable button to prevent double submit
+        const submitBtn = form.querySelector('#of-submit');
+        submitBtn.disabled = true;
+
         try {
-          const res = await fetch('/cart/add.js', {
+          // App Proxy endpoint (set this up in your custom app)
+          const res = await fetch('/apps/order-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ items })
+            body: JSON.stringify(payload)
           });
 
           if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err?.description || err?.message || 'Cart add failed');
+            const err = await res.json().catch(()=>({}));
+            throw new Error(err.message || 'Order request failed');
           }
 
-          window.location.href = '/cart';
-          return;
-        } catch (e) {
-          console.warn('Bulk add failed:', e?.message);
-          // 2) Fallback: add items one-by-one
-          try {
-            for (const it of items) {
-              const r = await fetch('/cart/add.js', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(it)
-              });
-              if (!r.ok) {
-                const je = await r.json().catch(() => ({}));
-                throw new Error(je?.description || je?.message || `Failed on variant ${it.id}`);
-              }
-            }
-            window.location.href = '/cart';
-            return;
-          } catch (e2) {
-            alert(`Sorry, couldn't add item(s): ${e2.message}`);
-          } finally {
-            addBtn.disabled = false;
-          }
+          const data = await res.json();
+          closeModal();
+          // Clear UI
+          rows.forEach(r => r.querySelector('.box-input').value='');
+          recalcTotals();
+
+          const ref = data?.draft_order?.name || data?.reference || 'Request received';
+          toast(`Order request submitted • ${ref}`);
+        } catch (err) {
+          console.error(err);
+          toast(err.message || 'Could not submit order request', false);
+        } finally {
+          submitBtn.disabled = false;
         }
       });
 
       recalcTotals();
     });
-  </script>
+    </script>
+
+  <!-- Order Request Modal -->
+  {%- comment -%} Prefill helpers for the modal {%- endcomment -%}
+  {% assign _full_name = '' %}
+  {% assign _email = '' %}
+  {% assign _company = '' %}
+  {% assign _phone = '' %}
+
+  {% if customer %}
+    {% assign _full_name = customer.first_name | append: ' ' | append: customer.last_name | strip %}
+    {% assign _email = customer.email | default: '' %}
+    {% assign _company = customer.default_address.company | default: '' %}
+    {% assign _phone = customer.phone | default: customer.default_address.phone | default: '' %}
+  {% endif %}
+
+  <div class="of-modal" id="of-modal" hidden>
+    <div class="of-modal__backdrop"></div>
+    <div class="of-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="of-modal-title">
+      <button class="of-modal__close" type="button" aria-label="Close">&times;</button>
+      <h3 id="of-modal-title" class="of-modal__title">Submit order request</h3>
+      <form id="of-request-form" novalidate>
+        <div class="of-grid">
+          <label class="of-field">
+            <span>Name</span>
+            <input type="text" name="name" required value="{{ _full_name | escape }}">
+          </label>
+          <label class="of-field">
+            <span>Email</span>
+            <input type="email" name="email" required value="{{ customer.email | default: '' }}">
+          </label>
+          <label class="of-field">
+            <span>Company (optional)</span>
+            <input type="text" name="company" value="{{ customer.default_address.company | default: '' }}">
+          </label>
+          <label class="of-field">
+            <span>Phone (optional)</span>
+            <input type="tel" name="phone" value="{{ customer.phone | default: customer.default_address.phone }}">
+          </label>
+          <label class="of-field of-field--full">
+            <span>Notes (optional)</span>
+            <textarea name="notes" rows="3" placeholder="Any delivery notes, needed-by dates, PO numbers, etc."></textarea>
+          </label>
+        </div>
+        <div class="of-modal__actions">
+          <button type="submit" class="of-btn of-btn--primary" id="of-submit">Send request</button>
+          <button type="button" class="of-btn of-btn--ghost of-cancel">Cancel</button>
+        </div>
+        <p class="of-help">We’ll email you a confirmation and our team will review your request before processing.</p>
+      </form>
+    </div>
+  </div>
+
 </section>
 
 {% schema %}
