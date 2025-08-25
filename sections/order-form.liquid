@@ -131,10 +131,12 @@ Order Form Section
                 {% endif %}
 
                 <tr class="order-row"
-                  data-variant-id={{ variant.id | json }}
-                  data-units-per-box="{{ units_per_box }}"
-                  data-cost-price="{{ cost_price_cents }}"
-                  data-rsp="{{ rsp_cents | divided_by: 100.0 }}">
+                data-variant-id={{ variant.id | json }}
+                data-units-per-box="{{ units_per_box }}"
+                data-cost-price="{{ cost_price_cents }}"
+                data-unit-price-cents="{{ rsp_inc_cents }}"
+                data-rsp="{{ rsp_cents | divided_by: 100.0 }}">
+
                   <td class="of-left">
                     <div class="of-product">
                       {% if product.featured_image %}
@@ -275,16 +277,17 @@ Order Form Section
       function recalcRow(row) {
         const boxes = Number(row.querySelector('.box-input').value || 0);
         const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-        const costPrice = Number(row.dataset.costPrice || 0); // cents
+        const unitPriceCents = Number(row.dataset.unitPriceCents || 0); // cents (RSP incl. VAT)
 
         const totalUnits = boxes * unitsPerBox;
-        const subtotal = totalUnits * costPrice / 100;
+        const subtotal = (totalUnits * unitPriceCents) / 100;
 
         row.querySelector('.total-units').textContent = totalUnits;
         row.querySelector('.subtotal').textContent = formatMoney(subtotal);
 
         return { totalUnits, subtotal };
       }
+
 
       function recalcTotals() {
         let totalUnits = 0;
