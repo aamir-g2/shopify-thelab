@@ -4,8 +4,10 @@ Order Form Section
 - Lets user enter # of boxes
 - Calculates total units & subtotal (based on cost price)
 - Adds multiple lines to cart via /cart/add.js
-- Filters to Wholesale variants by group letter using SKU prefix: WS-<GROUP>_
-  e.g. WS-A_12345 -> group=A, base SKU=12345
+- Dynamically filters to Wholesale variants using SKU prefix resolved from:
+    customer tag -> SKU prefix mapping blocks
+  Fallback when not logged in or no tag matched uses a default prefix.
+  e.g. WS-A_12345 -> base SKU=12345
 {% endcomment %}
 
 <section id="order-form-{{ section.id }}" class="order-form" style="--of-pad-block: {{ section.settings.pad_block }}px;">
@@ -14,13 +16,52 @@ Order Form Section
       <h2 class="order-form__heading">{{ section.settings.heading }}</h2>
     {% endif %}
 
-    {% assign order_collection = collections[section.settings.collection] %}
+    {%- comment -%} Resolve wholesale SKU prefix from the logged-in customer's tags via block mappings {%- endcomment -%}
+    {% assign ws_prefix = '' %}
+    {% assign ws_prefix_len = 0 %}
+    {% assign resolved_group_label = '' %}
 
-    {%- comment -%} Build wholesale prefix from setting {%- endcomment -%}
-    {% assign group_letter = section.settings.wholesale_group | strip | upcase %}
-    {% if group_letter == blank %}{% assign group_letter = 'A' %}{% endif %}
-    {% assign ws_prefix = 'WS-' | append: group_letter | append: '_' %}
-    {% assign ws_prefix_len = ws_prefix | size %}
+    {% if customer %}
+      {% assign cust_tags = customer.tags %}
+    {% else %}
+      {% assign cust_tags = '' %}
+    {% endif %}
+
+    {% if section.blocks.size > 0 %}
+      {% for block in section.blocks %}
+        {% if block.type == 'group_map' %}
+          {% assign tag = block.settings.customer_tag | strip %}
+          {% assign prefix = block.settings.sku_prefix | strip %}
+          {% assign label = block.settings.display_label | strip %}
+          {% if tag != blank and prefix != blank and customer %}
+            {%- comment -%} Shopify tags are space-separated strings; 'contains' works for exact tag substrings {%- endcomment -%}
+            {% if cust_tags contains tag %}
+              {% assign ws_prefix = prefix %}
+              {% assign ws_prefix_len = ws_prefix | size %}
+              {% assign resolved_group_label = label | default: tag %}
+              {% break %}
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {%- comment -%} Fallback when no match or not logged in {%- endcomment -%}
+    {% if ws_prefix == '' %}
+      {% assign ws_prefix = section.settings.default_sku_prefix | default: 'WS-A_' %}
+      {% assign ws_prefix_len = ws_prefix | size %}
+      {% if resolved_group_label == '' %}
+        {% assign resolved_group_label = section.settings.default_label | default: 'Default' %}
+      {% endif %}
+    {% endif %}
+
+    {% if section.settings.show_active_group and resolved_group_label != blank %}
+      <p class="of-active-group" style="opacity:.75;margin:.25rem 0 1rem 0;">
+        Showing prices for: <strong>{{ resolved_group_label }}</strong>
+      </p>
+    {% endif %}
+
+    {% assign order_collection = collections[section.settings.collection] %}
 
     {% if order_collection and order_collection.products_count > 0 %}
       <div class="order-form__table-wrap">
@@ -41,13 +82,12 @@ Order Form Section
             {% for product in order_collection.products %}
               {% for variant in product.variants %}
 
-                {%- comment -%} Filter: only Wholesale variants in selected group {%- endcomment -%}
+                {%- comment -%} Filter: only Wholesale variants in resolved group (by SKU prefix) {%- endcomment -%}
                 {% assign sku_raw = variant.sku | default: '' %}
                 {% if sku_raw == '' %}
                   {% continue %}
                 {% endif %}
 
-                {%- comment -%} Precompute the sliced prefix, then compare {%- endcomment -%}
                 {% assign prefix_slice = sku_raw | slice: 0, ws_prefix_len %}
                 {% if prefix_slice != ws_prefix %}
                   {% continue %}
@@ -55,7 +95,6 @@ Order Form Section
 
                 {%- comment -%} Strip the prefix for display {%- endcomment -%}
                 {% assign base_sku = sku_raw | remove_first: ws_prefix %}
-
 
                 {% assign units_per_box = variant.metafields.packaging.units_per_box.value 
                   | default: product.metafields.packaging.units_per_box.value 
@@ -79,16 +118,16 @@ Order Form Section
                 {% endif %}
 
                 {%- comment -%}
-                  Compute ex/incl VAT cents using 15% VAT.
-                  If your shop prices include tax, ex VAT = rsp / 1.15, incl VAT = rsp
-                  If not, ex VAT = rsp, incl VAT = rsp * 1.15
+                  Compute ex/incl VAT cents using 15% VAT with integer-safe math.
+                  If your shop prices include tax, ex VAT = rsp * 100 / 115, incl VAT = rsp
+                  If not, ex VAT = rsp, incl VAT = rsp * 115 / 100
                 {%- endcomment -%}
                 {% if shop.taxes_included %}
-                  {% assign rsp_ex_cents = rsp_cents | divided_by: 1.15 | round %}
+                  {% assign rsp_ex_cents = rsp_cents | times: 100 | divided_by: 115 %}
                   {% assign rsp_inc_cents = rsp_cents %}
                 {% else %}
                   {% assign rsp_ex_cents = rsp_cents %}
-                  {% assign rsp_inc_cents = rsp_cents | times: 1.15 | round %}
+                  {% assign rsp_inc_cents = rsp_cents | times: 115 | divided_by: 100 %}
                 {% endif %}
 
                 <tr class="order-row"
@@ -337,17 +376,53 @@ Order Form Section
     { "type": "text", "id": "heading", "label": "Heading", "default": "Order Form" },
     { "type": "collection", "id": "collection", "label": "Collection to show" },
     {
-      "type": "select",
-      "id": "wholesale_group",
-      "label": "Wholesale group",
-      "options": [
-        { "value": "A", "label": "A" },
-        { "value": "B", "label": "B" }
-      ],
-      "default": "A",
-      "info": "Filters variants by SKU prefix WS-<GROUP>_ (e.g. WS-A_)."
+      "type": "text",
+      "id": "default_sku_prefix",
+      "label": "Default SKU prefix (fallback)",
+      "default": "WS-A_",
+      "info": "Used when no customer tag matches (or customer not logged in). Example: WS-A_"
+    },
+    {
+      "type": "text",
+      "id": "default_label",
+      "label": "Default group label (fallback)",
+      "default": "Default",
+      "info": "Shown if you enable the 'Show active group' toggle."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_active_group",
+      "label": "Show active group label on page",
+      "default": true
     },
     { "type": "range", "id": "pad_block", "min": 0, "max": 80, "step": 4, "unit": "px", "label": "Top/bottom padding", "default": 40 }
+  ],
+  "blocks": [
+    {
+      "type": "group_map",
+      "name": "Pricing group mapping",
+      "limit": 20,
+      "settings": [
+        {
+          "type": "text",
+          "id": "customer_tag",
+          "label": "Customer tag",
+          "info": "Exact tag that identifies this pricing group (e.g. wholesale-A)."
+        },
+        {
+          "type": "text",
+          "id": "sku_prefix",
+          "label": "SKU prefix for this group",
+          "info": "Variants for this group must start with this prefix (e.g. WS-A_)."
+        },
+        {
+          "type": "text",
+          "id": "display_label",
+          "label": "Display label (optional)",
+          "info": "Human-friendly name to show (e.g. Group A). Falls back to the tag value."
+        }
+      ]
+    }
   ],
   "presets": [{ "name": "Order form" }]
 }
