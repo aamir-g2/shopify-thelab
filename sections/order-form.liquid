@@ -2,8 +2,8 @@
 Order Form Section
 - Lists products from a chosen collection
 - Lets user enter # of boxes
-- Calculates total units & subtotal (based on cost price)
-- Adds multiple lines to cart via /cart/add.js
+- Calculates total units & subtotal (based on ex-VAT price)
+- Submits an order request via Shopify's native contact form (includes CAPTCHA)
 - Dynamically filters to Wholesale variants using SKU prefix resolved from:
     customer tag -> SKU prefix mapping blocks
   Fallback when not logged in or no tag matched uses a default prefix.
@@ -34,7 +34,7 @@ Order Form Section
           {% assign prefix = block.settings.sku_prefix | strip %}
           {% assign label = block.settings.display_label | strip %}
           {% if tag != blank and prefix != blank and customer %}
-            {%- comment -%} Shopify tags are space-separated strings; 'contains' works for exact tag substrings {%- endcomment -%}
+            {%- comment -%} Shopify tags are space-separated strings; 'contains' is acceptable for tag checks {%- endcomment -%}
             {% if cust_tags contains tag %}
               {% assign ws_prefix = prefix %}
               {% assign ws_prefix_len = ws_prefix | size %}
@@ -131,12 +131,11 @@ Order Form Section
                 {% endif %}
 
                 <tr class="order-row"
-                data-variant-id={{ variant.id | json }}
-                data-units-per-box="{{ units_per_box }}"
-                data-cost-price="{{ cost_price_cents }}"
-                data-unit-price-cents="{{ rsp_ex_cents }}"
-                data-rsp="{{ rsp_cents | divided_by: 100.0 }}">
-
+                  data-variant-id={{ variant.id | json }}
+                  data-units-per-box="{{ units_per_box }}"
+                  data-cost-price="{{ cost_price_cents }}"
+                  data-unit-price-cents="{{ rsp_ex_cents }}"
+                  data-rsp="{{ rsp_cents | divided_by: 100.0 }}">
                   <td class="of-left">
                     <div class="of-product">
                       {% if product.featured_image %}
@@ -252,6 +251,7 @@ Order Form Section
     .of-btn--ghost:hover { background: color-mix(in oklab, currentColor 8%, transparent); }
     .of-btn:disabled { opacity: .5; cursor: not-allowed; }
     .of-empty { opacity: .7; }
+
     /* modal */
     .of-modal[hidden]{display:none}
     .of-modal{position:fixed;inset:0;z-index:9999}
@@ -276,7 +276,6 @@ Order Form Section
       bottom:16px; background:#111;color:#fff; padding:.6rem .9rem; border-radius:999px;
       font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.25); z-index:10000
     }
-
   </style>
 
   <script>
@@ -290,7 +289,7 @@ Order Form Section
         catch { return 'R ' + (Number(amount||0)).toFixed(2); }
       }
 
-      // --- table calc (ex-VAT totals, as discussed) ---
+      // --- table calc (ex-VAT totals) ---
       const rows = Array.from(section.querySelectorAll('.order-row'));
       const requestBtn = section.querySelector('#of-request-quote');
       const clearBtn = section.querySelector('#of-clear');
@@ -322,7 +321,7 @@ Order Form Section
       rows.forEach(row => row.querySelector('.box-input').addEventListener('input', recalcTotals, {passive:true}));
       clearBtn?.addEventListener('click', () => { rows.forEach(r => r.querySelector('.box-input').value=''); recalcTotals(); });
 
-      // --- modal + submit to App Proxy ---
+      // Modal
       const modal = document.getElementById('of-modal');
       const form = document.getElementById('of-request-form');
       const modalClose = modal.querySelector('.of-modal__close');
@@ -348,25 +347,58 @@ Order Form Section
           const boxes = Number(row.querySelector('.box-input').value || 0);
           if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-            const variantId = row.dataset.variantId;
             const qty = boxes * unitsPerBox;
-            const skuCell = row.querySelector('.of-sku');
             const title = row.querySelector('.of-name')?.textContent?.trim() || '';
-            const sku = skuCell ? skuCell.textContent.replace(/^SKU:\s*/,'').trim() : '';
-            items.push({ variant_id: variantId, quantity: qty, title, sku });
+            const sku = (row.querySelector('.of-sku')?.textContent || '').replace(/^SKU:\s*/,'').trim();
+            items.push({ title, sku, quantity: qty });
           }
         });
         return items;
       }
 
-      requestBtn?.addEventListener('click', () => {
-        if (requestBtn.disabled) return;
+      // Build a nice plaintext message for the store email
+      function buildContactBody(payload){
+        const { items, totals, customer_context, notes, source_url } = payload;
+        const lines = [];
+        lines.push('ORDER REQUEST');
+        lines.push('================');
+        lines.push('');
+        lines.push('Items:');
+        items.forEach(it => lines.push(`- ${it.title} [${it.sku}] × ${it.quantity}`));
+        lines.push('');
+        if (totals?.total_units != null) lines.push(`Total units: ${totals.total_units}`);
+        if (totals?.subtotal_ex_vat)   lines.push(`Subtotal (ex VAT): ${totals.subtotal_ex_vat}`);
+        lines.push('');
+        lines.push('Customer:');
+        lines.push(`${customer_context.name} <${customer_context.email}>`);
+        if (customer_context.company) lines.push(`Company: ${customer_context.company}`);
+        if (customer_context.phone)   lines.push(`Phone: ${customer_context.phone}`);
+        if (notes) { lines.push(''); lines.push('Notes:'); lines.push(notes); }
+        if (source_url) { lines.push(''); lines.push(`Source: ${source_url}`); }
+        return lines.join('\n');
+      }
+
+      // Submit to the hidden native contact form (injects CAPTCHA automatically)
+      function submitContactForm(payload){
+        const f = document.getElementById('of-contact-form');
+        if (!f) { alert('Contact form missing'); return; }
+        f.querySelector('#of-contact-name').value  = payload.customer_context.name || 'Order Request';
+        f.querySelector('#of-contact-email').value = payload.customer_context.email || '';
+        f.querySelector('#of-contact-body').value  = buildContactBody(payload);
+        f.submit(); // navigates to /contact success
+      }
+
+      // Open modal on click
+      const requestBtnEl = requestBtn;
+      requestBtnEl?.addEventListener('click', () => {
+        if (requestBtnEl.disabled) return;
         const items = collectItems();
         if (!items.length) { toast('Add at least one box.', false); return; }
         openModal();
       });
 
-      form?.addEventListener('submit', async (e) => {
+      // Handle modal submit -> contact form
+      form?.addEventListener('submit', (e) => {
         e.preventDefault();
         const items = collectItems();
         if (!items.length) { toast('No items selected.', false); return; }
@@ -376,10 +408,10 @@ Order Form Section
           items,
           totals: {
             total_units: Number(totalUnitsCell.textContent || 0),
-            subtotal_ex_vat: grandSubtotalCell.textContent // display only
+            subtotal_ex_vat: grandSubtotalCell.textContent
           },
           customer_context: {
-            id: {{ customer.id | default: 'null' }},
+            id: {{ customer.id | json }},
             email: fd.get('email'),
             name: fd.get('name'),
             company: fd.get('company'),
@@ -390,44 +422,16 @@ Order Form Section
           source_url: window.location.href
         };
 
-        // Disable button to prevent double submit
-        const submitBtn = form.querySelector('#of-submit');
-        submitBtn.disabled = true;
-
-        try {
-          // App Proxy endpoint (set this up in your custom app)
-          const res = await fetch('/apps/order-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const err = await res.json().catch(()=>({}));
-            throw new Error(err.message || 'Order request failed');
-          }
-
-          const data = await res.json();
-          closeModal();
-          // Clear UI
-          rows.forEach(r => r.querySelector('.box-input').value='');
-          recalcTotals();
-
-          const ref = data?.draft_order?.name || data?.reference || 'Request received';
-          toast(`Order request submitted • ${ref}`);
-        } catch (err) {
-          console.error(err);
-          toast(err.message || 'Could not submit order request', false);
-        } finally {
-          submitBtn.disabled = false;
-        }
+        // Submit to Shopify /contact with CAPTCHA via native form
+        submitContactForm(payload);
+        // Navigation to the contact page will occur; if you prefer to stay
+        // on this page, we can target an invisible iframe (let me know).
       });
 
       recalcTotals();
     });
-    </script>
+  </script>
 
-  <!-- Order Request Modal -->
   {%- comment -%} Prefill helpers for the modal {%- endcomment -%}
   {% assign _full_name = '' %}
   {% assign _email = '' %}
@@ -441,6 +445,7 @@ Order Form Section
     {% assign _phone = customer.phone | default: customer.default_address.phone | default: '' %}
   {% endif %}
 
+  <!-- Order Request Modal -->
   <div class="of-modal" id="of-modal" hidden>
     <div class="of-modal__backdrop"></div>
     <div class="of-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="of-modal-title">
@@ -454,15 +459,15 @@ Order Form Section
           </label>
           <label class="of-field">
             <span>Email</span>
-            <input type="email" name="email" required value="{{ customer.email | default: '' }}">
+            <input type="email" name="email" required value="{{ _email | escape }}">
           </label>
           <label class="of-field">
             <span>Company (optional)</span>
-            <input type="text" name="company" value="{{ customer.default_address.company | default: '' }}">
+            <input type="text" name="company" value="{{ _company | escape }}">
           </label>
           <label class="of-field">
             <span>Phone (optional)</span>
-            <input type="tel" name="phone" value="{{ customer.phone | default: customer.default_address.phone }}">
+            <input type="tel" name="phone" value="{{ _phone | escape }}">
           </label>
           <label class="of-field of-field--full">
             <span>Notes (optional)</span>
@@ -473,11 +478,19 @@ Order Form Section
           <button type="submit" class="of-btn of-btn--primary" id="of-submit">Send request</button>
           <button type="button" class="of-btn of-btn--ghost of-cancel">Cancel</button>
         </div>
-        <p class="of-help">We’ll email you a confirmation and our team will review your request before processing.</p>
+        <p class="of-help">Thanks! Our team will review your request and reply by email.</p>
       </form>
     </div>
   </div>
 
+  <!-- Hidden native Shopify contact form so CAPTCHA is included -->
+  <div aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden;">
+    {% form 'contact', id: 'of-contact-form' %}
+      <input type="hidden" name="contact[name]"  id="of-contact-name">
+      <input type="hidden" name="contact[email]" id="of-contact-email">
+      <textarea name="contact[body]" id="of-contact-body"></textarea>
+    {% endform %}
+  </div>
 </section>
 
 {% schema %}
