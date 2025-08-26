@@ -290,7 +290,7 @@ Order Form Section
         catch { return 'R ' + (Number(amount||0)).toFixed(2); }
       }
 
-      // --- table calc (ex-VAT totals, as discussed) ---
+      // --- existing totals logic (ex-VAT) ---
       const rows = Array.from(section.querySelectorAll('.order-row'));
       const requestBtn = section.querySelector('#of-request-quote');
       const clearBtn = section.querySelector('#of-clear');
@@ -307,7 +307,6 @@ Order Form Section
         row.querySelector('.subtotal').textContent = formatMoney(subtotal);
         return { totalUnits, subtotal };
       }
-
       function recalcTotals(){
         let totalUnits = 0, grandSubtotal = 0;
         rows.forEach(row => {
@@ -318,11 +317,10 @@ Order Form Section
         grandSubtotalCell.textContent = formatMoney(grandSubtotal);
         requestBtn.disabled = totalUnits === 0;
       }
-
       rows.forEach(row => row.querySelector('.box-input').addEventListener('input', recalcTotals, {passive:true}));
       clearBtn?.addEventListener('click', () => { rows.forEach(r => r.querySelector('.box-input').value=''); recalcTotals(); });
 
-      // --- modal + submit to App Proxy ---
+      // Modal controls
       const modal = document.getElementById('of-modal');
       const form = document.getElementById('of-request-form');
       const modalClose = modal.querySelector('.of-modal__close');
@@ -348,17 +346,58 @@ Order Form Section
           const boxes = Number(row.querySelector('.box-input').value || 0);
           if (boxes > 0) {
             const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-            const variantId = row.dataset.variantId;
             const qty = boxes * unitsPerBox;
-            const skuCell = row.querySelector('.of-sku');
             const title = row.querySelector('.of-name')?.textContent?.trim() || '';
-            const sku = skuCell ? skuCell.textContent.replace(/^SKU:\s*/,'').trim() : '';
-            items.push({ variant_id: variantId, quantity: qty, title, sku });
+            const sku = (row.querySelector('.of-sku')?.textContent || '').replace(/^SKU:\s*/,'').trim();
+            items.push({ title, sku, quantity: qty });
           }
         });
         return items;
       }
 
+      // Build a nice plaintext message for the store email
+      function buildContactBody(payload){
+        const { items, totals, customer_context, notes, source_url } = payload;
+        const lines = [];
+        lines.push('ORDER REQUEST');
+        lines.push('================');
+        lines.push('');
+        lines.push('Items:');
+        items.forEach(it => lines.push(`- ${it.title} [${it.sku}] × ${it.quantity}`));
+        lines.push('');
+        if (totals?.total_units != null) lines.push(`Total units: ${totals.total_units}`);
+        if (totals?.subtotal_ex_vat)   lines.push(`Subtotal (ex VAT): ${totals.subtotal_ex_vat}`);
+        lines.push('');
+        lines.push('Customer:');
+        lines.push(`${customer_context.name} <${customer_context.email}>`);
+        if (customer_context.company) lines.push(`Company: ${customer_context.company}`);
+        if (customer_context.phone)   lines.push(`Phone: ${customer_context.phone}`);
+        if (notes) { lines.push(''); lines.push('Notes:'); lines.push(notes); }
+        if (source_url) { lines.push(''); lines.push(`Source: ${source_url}`); }
+        return lines.join('\n');
+      }
+
+      // Submit to Shopify's contact endpoint so the STORE receives an email
+      function submitContactForm(payload){
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/contact#contact_form';
+        form.style.display = 'none';
+
+        const add = (n,v) => { const i = document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; form.appendChild(i); };
+
+        add('form_type','contact');
+        add('utf8','✓');
+
+        add('contact[name]', payload.customer_context.name || 'Order Request');
+        add('contact[email]', payload.customer_context.email || '');
+        add('contact[body]', buildContactBody(payload));
+
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      // Open modal on click
       requestBtn?.addEventListener('click', () => {
         if (requestBtn.disabled) return;
         const items = collectItems();
@@ -366,7 +405,8 @@ Order Form Section
         openModal();
       });
 
-      form?.addEventListener('submit', async (e) => {
+      // Handle modal submit
+      form?.addEventListener('submit', (e) => {
         e.preventDefault();
         const items = collectItems();
         if (!items.length) { toast('No items selected.', false); return; }
@@ -376,10 +416,10 @@ Order Form Section
           items,
           totals: {
             total_units: Number(totalUnitsCell.textContent || 0),
-            subtotal_ex_vat: grandSubtotalCell.textContent // display only
+            subtotal_ex_vat: grandSubtotalCell.textContent
           },
           customer_context: {
-            id: {{ customer.id | default: 'null' }},
+            id: {{ customer.id | json }},
             email: fd.get('email'),
             name: fd.get('name'),
             company: fd.get('company'),
@@ -390,60 +430,17 @@ Order Form Section
           source_url: window.location.href
         };
 
-        // Disable button to prevent double submit
-        const submitBtn = form.querySelector('#of-submit');
-        submitBtn.disabled = true;
+        // Submit to /contact to email the STORE; customer won't get an automatic copy
+        submitContactForm(payload);
 
-        try {
-          // App Proxy endpoint (set this up in your custom app)
-          const res = await fetch('/apps/order-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const err = await res.json().catch(()=>({}));
-            throw new Error(err.message || 'Order request failed');
-          }
-
-          const data = await res.json();
-          closeModal();
-          // Clear UI
-          rows.forEach(r => r.querySelector('.box-input').value='');
-          recalcTotals();
-
-          const ref = data?.draft_order?.name || data?.reference || 'Request received';
-          toast(`Order request submitted • ${ref}`);
-        } catch (err) {
-          console.error(err);
-          toast(err.message || 'Could not submit order request', false);
-        } finally {
-          submitBtn.disabled = false;
-        }
-
-        // After creating the draft order:
-        await fetch(`https://${SHOPIFY_SHOP}/admin/api/${LATEST_API_VERSION}/draft_orders/${draft.id}/send_invoice.json`, {
-          method: 'POST',
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            draft_order_invoice: {
-              to: customer_context.email,
-              bcc: 'aamir@g2design.co.za',
-              subject: `Order request ${draft.name}`,
-              custom_message: `Thanks, we’ve received your order request. Reference: ${draft.name}`
-            }
-          })
-        });
-
+        // Clear local UI and close modal (the /contact page will load)
+        // If you prefer to stay on page, you'd need an iframe target – but the built-in endpoint navigates.
       });
 
       recalcTotals();
     });
-    </script>
+  </script>
+
 
   <!-- Order Request Modal -->
   {%- comment -%} Prefill helpers for the modal {%- endcomment -%}
