@@ -382,11 +382,27 @@ Order Form Section
       function submitContactForm(payload){
         const f = document.getElementById('of-contact-form');
         if (!f) { alert('Contact form missing'); return; }
+
         f.querySelector('#of-contact-name').value  = payload.customer_context.name || 'Order Request';
         f.querySelector('#of-contact-email').value = payload.customer_context.email || '';
         f.querySelector('#of-contact-body').value  = buildContactBody(payload);
-        f.submit(); // navigates to /contact success
+
+        // Use requestSubmit so Shopify's CAPTCHA handler runs
+        const btn = f.querySelector('#of-contact-submit') || (function(){
+          const b = document.createElement('button');
+          b.type = 'submit'; b.id = 'of-contact-submit'; b.hidden = true; f.appendChild(b);
+          return b;
+        })();
+
+        if (typeof f.requestSubmit === 'function') {
+          f.requestSubmit(btn);
+        } else {
+          // Fallback: fire a submit event; if not prevented, submit.
+          const evt = new Event('submit', { bubbles: true, cancelable: true });
+          if (f.dispatchEvent(evt)) f.submit();
+        }
       }
+
 
       // Open modal on click
       const requestBtnEl = requestBtn;
@@ -484,13 +500,21 @@ Order Form Section
   </div>
 
   <!-- Hidden native Shopify contact form so CAPTCHA is included -->
-  <div aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden;">
+  <style>
+    .of-hidden-contact {
+      position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;
+    }
+  </style>
+  <div class="of-hidden-contact" aria-hidden="true">
     {% form 'contact', id: 'of-contact-form' %}
       <input type="hidden" name="contact[name]"  id="of-contact-name">
       <input type="hidden" name="contact[email]" id="of-contact-email">
       <textarea name="contact[body]" id="of-contact-body"></textarea>
+      <!-- real submit button so requestSubmit can target it -->
+      <button type="submit" id="of-contact-submit">Send</button>
     {% endform %}
   </div>
+
 </section>
 
 {% schema %}
