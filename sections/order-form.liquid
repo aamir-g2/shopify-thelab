@@ -395,11 +395,20 @@ Order Form Section
 
       try {
         // App Proxy endpoint (set this up in your custom app)
-        const res = await fetch('https://shopify-draft-order-ruddy.vercel.app/api/order-request', {
+        // Point to your deployed function (Direct mode)
+        const ORDER_ENDPOINT = 'https://shopify-draft-order-ruddy.vercel.app/api/order-request';
+
+        const res = await fetch(ORDER_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            // Required by your server guard in Direct mode:
+            'X-Shop-Domain': '{{ shop.permanent_domain }}'
+          },
           body: JSON.stringify(payload)
         });
+
 
         if (!res.ok) {
           const err = await res.json().catch(()=>({}));
