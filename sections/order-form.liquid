@@ -278,175 +278,154 @@ Order Form Section
     }
   </style>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const section = document.getElementById('order-form-{{ section.id }}');
-      if (!section) return;
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const section = document.getElementById('order-form-{{ section.id }}');
+    if (!section) return;
 
-      // Money (ZAR)
-      function formatMoney(amount){
-        try { return new Intl.NumberFormat('en-ZA', {style:'currency', currency:'ZAR'}).format(Number(amount||0)); }
-        catch { return 'R ' + (Number(amount||0)).toFixed(2); }
-      }
+    // Money (ZAR)
+    function formatMoney(amount){
+      try { return new Intl.NumberFormat('en-ZA', {style:'currency', currency:'ZAR'}).format(Number(amount||0)); }
+      catch { return 'R ' + (Number(amount||0)).toFixed(2); }
+    }
 
-      // --- table calc (ex-VAT totals) ---
-      const rows = Array.from(section.querySelectorAll('.order-row'));
-      const requestBtn = section.querySelector('#of-request-quote');
-      const clearBtn = section.querySelector('#of-clear');
-      const totalUnitsCell = section.querySelector('#of-total-units');
-      const grandSubtotalCell = section.querySelector('#of-grand-subtotal');
+    // --- table calc (ex-VAT totals, as discussed) ---
+    const rows = Array.from(section.querySelectorAll('.order-row'));
+    const requestBtn = section.querySelector('#of-request-quote');
+    const clearBtn = section.querySelector('#of-clear');
+    const totalUnitsCell = section.querySelector('#of-total-units');
+    const grandSubtotalCell = section.querySelector('#of-grand-subtotal');
 
-      function recalcRow(row){
+    function recalcRow(row){
+      const boxes = Number(row.querySelector('.box-input').value || 0);
+      const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
+      const unitPriceCents = Number(row.dataset.unitPriceCents || 0); // ex-VAT cents
+      const totalUnits = boxes * unitsPerBox;
+      const subtotal = (totalUnits * unitPriceCents) / 100;
+      row.querySelector('.total-units').textContent = totalUnits;
+      row.querySelector('.subtotal').textContent = formatMoney(subtotal);
+      return { totalUnits, subtotal };
+    }
+
+    function recalcTotals(){
+      let totalUnits = 0, grandSubtotal = 0;
+      rows.forEach(row => {
+        const { totalUnits: u, subtotal: s } = recalcRow(row);
+        totalUnits += u; grandSubtotal += s;
+      });
+      totalUnitsCell.textContent = totalUnits;
+      grandSubtotalCell.textContent = formatMoney(grandSubtotal);
+      requestBtn.disabled = totalUnits === 0;
+    }
+
+    rows.forEach(row => row.querySelector('.box-input').addEventListener('input', recalcTotals, {passive:true}));
+    clearBtn?.addEventListener('click', () => { rows.forEach(r => r.querySelector('.box-input').value=''); recalcTotals(); });
+
+    // --- modal + submit to App Proxy ---
+    const modal = document.getElementById('of-modal');
+    const form = document.getElementById('of-request-form');
+    const modalClose = modal.querySelector('.of-modal__close');
+    const modalCancel = modal.querySelector('.of-cancel');
+    function openModal(){ modal.removeAttribute('hidden'); }
+    function closeModal(){ modal.setAttribute('hidden',''); }
+    modalClose.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if(e.target.classList.contains('of-modal__backdrop')) closeModal(); });
+
+    function toast(msg, ok=true){
+      const el = document.createElement('div');
+      el.className = 'of-toast';
+      el.style.background = ok ? '#111' : '#b00020';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(()=>{ el.remove(); }, 3500);
+    }
+
+    function collectItems(){
+      const items = [];
+      rows.forEach(row => {
         const boxes = Number(row.querySelector('.box-input').value || 0);
-        const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-        const unitPriceCents = Number(row.dataset.unitPriceCents || 0); // ex-VAT cents
-        const totalUnits = boxes * unitsPerBox;
-        const subtotal = (totalUnits * unitPriceCents) / 100;
-        row.querySelector('.total-units').textContent = totalUnits;
-        row.querySelector('.subtotal').textContent = formatMoney(subtotal);
-        return { totalUnits, subtotal };
-      }
-
-      function recalcTotals(){
-        let totalUnits = 0, grandSubtotal = 0;
-        rows.forEach(row => {
-          const { totalUnits: u, subtotal: s } = recalcRow(row);
-          totalUnits += u; grandSubtotal += s;
-        });
-        totalUnitsCell.textContent = totalUnits;
-        grandSubtotalCell.textContent = formatMoney(grandSubtotal);
-        requestBtn.disabled = totalUnits === 0;
-      }
-
-      rows.forEach(row => row.querySelector('.box-input').addEventListener('input', recalcTotals, {passive:true}));
-      clearBtn?.addEventListener('click', () => { rows.forEach(r => r.querySelector('.box-input').value=''); recalcTotals(); });
-
-      // Modal
-      const modal = document.getElementById('of-modal');
-      const form = document.getElementById('of-request-form');
-      const modalClose = modal.querySelector('.of-modal__close');
-      const modalCancel = modal.querySelector('.of-cancel');
-      function openModal(){ modal.removeAttribute('hidden'); }
-      function closeModal(){ modal.setAttribute('hidden',''); }
-      modalClose.addEventListener('click', closeModal);
-      modalCancel.addEventListener('click', closeModal);
-      modal.addEventListener('click', (e)=>{ if(e.target.classList.contains('of-modal__backdrop')) closeModal(); });
-
-      function toast(msg, ok=true){
-        const el = document.createElement('div');
-        el.className = 'of-toast';
-        el.style.background = ok ? '#111' : '#b00020';
-        el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(()=>{ el.remove(); }, 3500);
-      }
-
-      function collectItems(){
-        const items = [];
-        rows.forEach(row => {
-          const boxes = Number(row.querySelector('.box-input').value || 0);
-          if (boxes > 0) {
-            const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
-            const qty = boxes * unitsPerBox;
-            const title = row.querySelector('.of-name')?.textContent?.trim() || '';
-            const sku = (row.querySelector('.of-sku')?.textContent || '').replace(/^SKU:\s*/,'').trim();
-            items.push({ title, sku, quantity: qty });
-          }
-        });
-        return items;
-      }
-
-      // Build a nice plaintext message for the store email
-      function buildContactBody(payload){
-        const { items, totals, customer_context, notes, source_url } = payload;
-        const lines = [];
-        lines.push('ORDER REQUEST');
-        lines.push('================');
-        lines.push('');
-        lines.push('Items:');
-        items.forEach(it => lines.push(`- ${it.title} [${it.sku}] × ${it.quantity}`));
-        lines.push('');
-        if (totals?.total_units != null) lines.push(`Total units: ${totals.total_units}`);
-        if (totals?.subtotal_ex_vat)   lines.push(`Subtotal (ex VAT): ${totals.subtotal_ex_vat}`);
-        lines.push('');
-        lines.push('Customer:');
-        lines.push(`${customer_context.name} <${customer_context.email}>`);
-        if (customer_context.company) lines.push(`Company: ${customer_context.company}`);
-        if (customer_context.phone)   lines.push(`Phone: ${customer_context.phone}`);
-        if (notes) { lines.push(''); lines.push('Notes:'); lines.push(notes); }
-        if (source_url) { lines.push(''); lines.push(`Source: ${source_url}`); }
-        return lines.join('\n');
-      }
-
-      // Submit to the hidden native contact form (injects CAPTCHA automatically)
-      function submitContactForm(payload){
-        const f = document.getElementById('of-contact-form');
-        if (!f) { alert('Contact form missing'); return; }
-
-        f.querySelector('#of-contact-name').value  = payload.customer_context.name || 'Order Request';
-        f.querySelector('#of-contact-email').value = payload.customer_context.email || '';
-        f.querySelector('#of-contact-body').value  = buildContactBody(payload);
-
-        // Use requestSubmit so Shopify's CAPTCHA handler runs
-        const btn = f.querySelector('#of-contact-submit') || (function(){
-          const b = document.createElement('button');
-          b.type = 'submit'; b.id = 'of-contact-submit'; b.hidden = true; f.appendChild(b);
-          return b;
-        })();
-
-        if (typeof f.requestSubmit === 'function') {
-          f.requestSubmit(btn);
-        } else {
-          // Fallback: fire a submit event; if not prevented, submit.
-          const evt = new Event('submit', { bubbles: true, cancelable: true });
-          if (f.dispatchEvent(evt)) f.submit();
+        if (boxes > 0) {
+          const unitsPerBox = Number(row.dataset.unitsPerBox || 1);
+          const variantId = row.dataset.variantId;
+          const qty = boxes * unitsPerBox;
+          const skuCell = row.querySelector('.of-sku');
+          const title = row.querySelector('.of-name')?.textContent?.trim() || '';
+          const sku = skuCell ? skuCell.textContent.replace(/^SKU:\s*/,'').trim() : '';
+          items.push({ variant_id: variantId, quantity: qty, title, sku });
         }
-      }
-
-
-      // Open modal on click
-      const requestBtnEl = requestBtn;
-      requestBtnEl?.addEventListener('click', () => {
-        if (requestBtnEl.disabled) return;
-        const items = collectItems();
-        if (!items.length) { toast('Add at least one box.', false); return; }
-        openModal();
       });
+      return items;
+    }
 
-      // Handle modal submit -> contact form
-      form?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const items = collectItems();
-        if (!items.length) { toast('No items selected.', false); return; }
-
-        const fd = new FormData(form);
-        const payload = {
-          items,
-          totals: {
-            total_units: Number(totalUnitsCell.textContent || 0),
-            subtotal_ex_vat: grandSubtotalCell.textContent
-          },
-          customer_context: {
-            id: {{ customer.id | json }},
-            email: fd.get('email'),
-            name: fd.get('name'),
-            company: fd.get('company'),
-            phone: fd.get('phone')
-          },
-          notes: fd.get('notes') || '',
-          section_id: '{{ section.id }}',
-          source_url: window.location.href
-        };
-
-        // Submit to Shopify /contact with CAPTCHA via native form
-        submitContactForm(payload);
-        // Navigation to the contact page will occur; if you prefer to stay
-        // on this page, we can target an invisible iframe (let me know).
-      });
-
-      recalcTotals();
+    requestBtn?.addEventListener('click', () => {
+      if (requestBtn.disabled) return;
+      const items = collectItems();
+      if (!items.length) { toast('Add at least one box.', false); return; }
+      openModal();
     });
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const items = collectItems();
+      if (!items.length) { toast('No items selected.', false); return; }
+
+      const fd = new FormData(form);
+      const payload = {
+        items,
+        totals: {
+          total_units: Number(totalUnitsCell.textContent || 0),
+          subtotal_ex_vat: grandSubtotalCell.textContent // display only
+        },
+        customer_context: {
+          id: {{ customer.id | default: 'null' }},
+          email: fd.get('email'),
+          name: fd.get('name'),
+          company: fd.get('company'),
+          phone: fd.get('phone')
+        },
+        notes: fd.get('notes') || '',
+        section_id: '{{ section.id }}',
+        source_url: window.location.href
+      };
+
+      // Disable button to prevent double submit
+      const submitBtn = form.querySelector('#of-submit');
+      submitBtn.disabled = true;
+
+      try {
+        // App Proxy endpoint (set this up in your custom app)
+        const res = await fetch('https://shopify-draft-order-ruddy.vercel.app/api/order-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({}));
+          throw new Error(err.message || 'Order request failed');
+        }
+
+        const data = await res.json();
+        closeModal();
+        // Clear UI
+        rows.forEach(r => r.querySelector('.box-input').value='');
+        recalcTotals();
+
+        const ref = data?.draft_order?.name || data?.reference || 'Request received';
+        toast(`Order request submitted • ${ref}`);
+      } catch (err) {
+        console.error(err);
+        toast(err.message || 'Could not submit order request', false);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    recalcTotals();
+  });
   </script>
+
 
   {%- comment -%} Prefill helpers for the modal {%- endcomment -%}
   {% assign _full_name = '' %}
