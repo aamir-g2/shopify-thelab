@@ -21,6 +21,10 @@
             "subheading": "Probiotic cleaning with Microbiome Support",
             "title": "Introducing GoodBasics",
             "heading_tag": "h0",
+            "override_heading_sizes": false,
+            "heading_fs_mobile_custom": 40,
+            "heading_fs_tablet_custom": 56,
+            "heading_fs_desktop_custom": 72,
             "button_text": "",
             "button_link": "",
             "text_color": "#ffffff",
@@ -46,7 +50,10 @@
         "autoplay": true,
         "cycle_speed": 6,
         "background": "#f2f2f2",
-        "background_gradient": "linear-gradient(60deg, rgba(60, 65, 68, 1), rgba(23, 29, 33, 1) 98%)"
+        "background_gradient": "linear-gradient(60deg, rgba(60, 65, 68, 1), rgba(23, 29, 33, 1) 98%)",
+        "heading_fs_mobile": 40,
+        "heading_fs_tablet": 56,
+        "heading_fs_desktop": 72
       }
     },
     "media-grid": {
@@ -209,7 +216,7 @@
         "collection": "order-form",
         "default_sku_prefix": "WS-B_",
         "default_label": "Default",
-        "show_active_group": true,
+        "show_active_group": false,
         "pad_block": 40
       }
     },
