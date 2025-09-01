@@ -34,7 +34,38 @@ CSS
       --slideshow-slide-controls-background: {{ controls_background.rgb }};
       --slideshow-slide-controls-color: {{ controls_color.rgb }};
     }
+    #block-{{ block.id }} {
+      {%- if block.settings.override_heading_sizes -%}
+        --heading-fs-mobile: {{ block.settings.heading_fs_mobile_custom }}px;
+        --heading-fs-tablet: {{ block.settings.heading_fs_tablet_custom }}px;
+        --heading-fs-desktop: {{ block.settings.heading_fs_desktop_custom }}px;
+      {%- else -%}
+        --heading-fs-mobile: {{ section.settings.heading_fs_mobile }}px;
+        --heading-fs-tablet: {{ section.settings.heading_fs_tablet }}px;
+        --heading-fs-desktop: {{ section.settings.heading_fs_desktop }}px;
+      {%- endif -%}
+    }
+
   {%- endfor -%}
+
+  /* Custom heading sizes (per-slide via CSS variables set below) */
+  .slideshow__slide [data-sequence="heading"] {
+    font-size: var(--heading-fs-mobile) !important;
+    line-height: 1.1;
+  }
+
+  @media (min-width: 700px) {
+    .slideshow__slide [data-sequence="heading"] {
+      font-size: var(--heading-fs-tablet, var(--heading-fs-mobile)) !important;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .slideshow__slide [data-sequence="heading"] {
+      font-size: var(--heading-fs-desktop, var(--heading-fs-tablet, var(--heading-fs-mobile))) !important;
+    }
+  }
+
 </style>
 
 {%- comment -%}
@@ -223,26 +254,11 @@ LIQUID
       "id": "image_size",
       "label": "Media size",
       "options": [
-        {
-          "value": "auto",
-          "label": "Original media ratio"
-        },
-        {
-          "value": "sm",
-          "label": "Small"
-        },
-        {
-          "value": "md",
-          "label": "Medium"
-        },
-        {
-          "value": "lg",
-          "label": "Large"
-        },
-        {
-          "value": "fill",
-          "label": "Fill screen height"
-        }
+        { "value": "auto", "label": "Original media ratio" },
+        { "value": "sm", "label": "Small" },
+        { "value": "md", "label": "Medium" },
+        { "value": "lg", "label": "Large" },
+        { "value": "fill", "label": "Fill screen height" }
       ],
       "info": "Choose \"Original media ratio\" to not cut media. [Learn more](https://help.shopify.com/en/manual/online-store/images/theme-images#best-practices-for-slideshows-and-full-width-images)",
       "default": "auto"
@@ -252,26 +268,11 @@ LIQUID
       "id": "controls_type",
       "label": "Controls",
       "options": [
-        {
-          "value": "none",
-          "label": "None"
-        },
-        {
-          "value": "filled_arrows",
-          "label": "Filled arrows"
-        },
-        {
-          "value": "outline_arrows",
-          "label": "Outline arrows"
-        },
-        {
-          "value": "numbers",
-          "label": "Numbers"
-        },
-        {
-          "value": "dots",
-          "label": "Dots"
-        }
+        { "value": "none", "label": "None" },
+        { "value": "filled_arrows", "label": "Filled arrows" },
+        { "value": "outline_arrows", "label": "Outline arrows" },
+        { "value": "numbers", "label": "Numbers" },
+        { "value": "dots", "label": "Dots" }
       ],
       "default": "dots"
     },
@@ -280,14 +281,8 @@ LIQUID
       "id": "transition_type",
       "label": "Transition type",
       "options": [
-        {
-          "value": "fade",
-          "label": "Fade"
-        },
-        {
-          "value": "fade_with_text",
-          "label": "Fade with text transition"
-        }
+        { "value": "fade", "label": "Fade" },
+        { "value": "fade_with_text", "label": "Fade with text transition" }
       ],
       "default": "fade_with_text"
     },
@@ -323,6 +318,40 @@ LIQUID
       "type": "color_background",
       "id": "background_gradient",
       "label": "Background gradient"
+    },
+    {
+      "type": "header",
+      "content": "Heading sizes (defaults)"
+    },
+    {
+      "type": "range",
+      "id": "heading_fs_mobile",
+      "label": "Heading size – Mobile",
+      "min": 12,
+      "max": 96,
+      "step": 1,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "heading_fs_tablet",
+      "label": "Heading size – Tablet",
+      "min": 12,
+      "max": 120,
+      "step": 2,
+      "unit": "px",
+      "default": 56
+    },
+    {
+      "type": "range",
+      "id": "heading_fs_desktop",
+      "label": "Heading size – Desktop",
+      "min": 12,
+      "max": 160,
+      "step": 2,
+      "unit": "px",
+      "default": 72
     }
   ],
   "blocks": [
@@ -330,69 +359,23 @@ LIQUID
       "type": "image",
       "name": "Image",
       "settings": [
-        {
-          "type": "image_picker",
-          "id": "image",
-          "info": "2800 x 1000px .jpg recommended",
-          "label": "Image"
-        },
-        {
-          "type": "image_picker",
-          "id": "mobile_image",
-          "label": "Mobile image",
-          "info": "1200 x 1600px .jpg recommended"
-        },
-        {
-          "type": "header",
-          "content": "Content"
-        },
-        {
-          "type": "range",
-          "id": "content_max_width",
-          "label": "Content maximum width",
-          "min": 400,
-          "max": 1200,
-          "step": 20,
-          "unit": "px",
-          "default": 780
-        },
+        { "type": "image_picker", "id": "image", "info": "2800 x 1000px .jpg recommended", "label": "Image" },
+        { "type": "image_picker", "id": "mobile_image", "label": "Mobile image", "info": "1200 x 1600px .jpg recommended" },
+        { "type": "header", "content": "Content" },
+        { "type": "range", "id": "content_max_width", "label": "Content maximum width", "min": 400, "max": 1200, "step": 20, "unit": "px", "default": 780 },
         {
           "type": "select",
           "id": "mobile_text_position",
           "label": "Mobile content position",
           "options": [
-            {
-              "value": "place-self-start text-start",
-              "label": "Top left"
-            },
-            {
-              "value": "place-self-start-center text-center",
-              "label": "Top center"
-            },
-            {
-              "value": "place-self-start-end text-end",
-              "label": "Top right"
-            },
-            {
-              "value": "place-self-center-start text-start",
-              "label": "Middle left"
-            },
-            {
-              "value": "place-self-center text-center",
-              "label": "Middle center"
-            },
-            {
-              "value": "place-self-center-end text-end",
-              "label": "Middle right"
-            },
-            {
-              "value": "place-self-end-start text-start",
-              "label": "Bottom left"
-            },
-            {
-              "value": "place-self-end-center text-center",
-              "label": "Bottom center"
-            }
+            { "value": "place-self-start text-start", "label": "Top left" },
+            { "value": "place-self-start-center text-center", "label": "Top center" },
+            { "value": "place-self-start-end text-end", "label": "Top right" },
+            { "value": "place-self-center-start text-start", "label": "Middle left" },
+            { "value": "place-self-center text-center", "label": "Middle center" },
+            { "value": "place-self-center-end text-end", "label": "Middle right" },
+            { "value": "place-self-end-start text-start", "label": "Bottom left" },
+            { "value": "place-self-end-center text-center", "label": "Bottom center" }
           ],
           "default": "place-self-center text-center"
         },
@@ -401,225 +384,109 @@ LIQUID
           "id": "desktop_text_position",
           "label": "Desktop content position",
           "options": [
-            {
-              "value": "sm:place-self-start sm:text-start",
-              "label": "Top left"
-            },
-            {
-              "value": "sm:place-self-start-center sm:text-center",
-              "label": "Top center"
-            },
-            {
-              "value": "sm:place-self-start-end sm:text-end",
-              "label": "Top right"
-            },
-            {
-              "value": "sm:place-self-center-start sm:text-start",
-              "label": "Middle left"
-            },
-            {
-              "value": "sm:place-self-center sm:text-center",
-              "label": "Middle center"
-            },
-            {
-              "value": "sm:place-self-center-end sm:text-end",
-              "label": "Middle right"
-            },
-            {
-              "value": "sm:place-self-end-start sm:text-start",
-              "label": "Bottom left"
-            },
-            {
-              "value": "sm:place-self-end-center sm:text-center",
-              "label": "Bottom center"
-            }
+            { "value": "sm:place-self-start sm:text-start", "label": "Top left" },
+            { "value": "sm:place-self-start-center sm:text-center", "label": "Top center" },
+            { "value": "sm:place-self-start-end sm:text-end", "label": "Top right" },
+            { "value": "sm:place-self-center-start sm:text-start", "label": "Middle left" },
+            { "value": "sm:place-self-center sm:text-center", "label": "Middle center" },
+            { "value": "sm:place-self-center-end sm:text-end", "label": "Middle right" },
+            { "value": "sm:place-self-end-start sm:text-start", "label": "Bottom left" },
+            { "value": "sm:place-self-end-center sm:text-center", "label": "Bottom center" }
           ],
           "default": "sm:place-self-center sm:text-center"
         },
-        {
-          "type": "text",
-          "id": "subheading",
-          "label": "Subheading",
-          "default": "Tell your story"
-        },
-        {
-          "type": "text",
-          "id": "title",
-          "label": "Heading",
-          "default": "Slide title"
-        },
+        { "type": "text", "id": "subheading", "label": "Subheading", "default": "Tell your story" },
+        { "type": "text", "id": "title", "label": "Heading", "default": "Slide title" },
         {
           "type": "select",
           "id": "heading_tag",
           "label": "Heading size",
           "options": [
-            {
-              "value": "h0",
-              "label": "XX-Large"
-            },
-            {
-              "value": "h1",
-              "label": "X-Large"
-            },
-            {
-              "value": "h2",
-              "label": "Large"
-            },
-            {
-              "value": "h3",
-              "label": "Medium"
-            },
-            {
-              "value": "h4",
-              "label": "Small"
-            },
-            {
-              "value": "h5",
-              "label": "X-Small"
-            },
-            {
-              "value": "h6",
-              "label": "XX-Small"
-            }
+            { "value": "h0", "label": "XX-Large" },
+            { "value": "h1", "label": "X-Large" },
+            { "value": "h2", "label": "Large" },
+            { "value": "h3", "label": "Medium" },
+            { "value": "h4", "label": "Small" },
+            { "value": "h5", "label": "X-Small" },
+            { "value": "h6", "label": "XX-Small" }
           ],
           "default": "h0"
         },
         {
-          "type": "text",
-          "id": "button_text",
-          "label": "Button text"
-        },
-        {
-          "type": "url",
-          "id": "button_link",
-          "label": "Button link",
-          "info": "Leave the button text empty to make the slide fully clickable."
-        },
-        {
           "type": "header",
-          "content": "Slide colors"
+          "content": "Custom heading sizes (this slide)"
         },
         {
-          "type": "color",
-          "id": "text_color",
-          "label": "Text",
-          "default": "#ffffff"
-        },
-        {
-          "type": "color",
-          "id": "button_background",
-          "label": "Button background",
-          "default": "#ffffff"
-        },
-        {
-          "type": "color",
-          "id": "button_text_color",
-          "label": "Button text",
-          "default": "#000000"
-        },
-        {
-          "type": "color",
-          "id": "overlay_color",
-          "label": "Overlay",
-          "default": "#000000"
+          "type": "checkbox",
+          "id": "override_heading_sizes",
+          "label": "Use custom heading sizes for this slide",
+          "default": false
         },
         {
           "type": "range",
-          "id": "overlay_opacity",
-          "label": "Overlay opacity",
-          "min": 0,
-          "max": 100,
+          "id": "heading_fs_mobile_custom",
+          "label": "Heading size – Mobile (this slide)",
+          "min": 12,
+          "max": 96,
           "step": 1,
-          "unit": "%",
-          "default": 30
+          "unit": "px",
+          "default": 40
         },
         {
-          "type": "header",
-          "content": "Background",
-          "info": "Disable the \"Full width\" setting at the slideshow level to show background."
+          "type": "range",
+          "id": "heading_fs_tablet_custom",
+          "label": "Heading size – Tablet (this slide)",
+          "min": 12,
+          "max": 120,
+          "step": 2,
+          "unit": "px",
+          "default": 56
         },
         {
-          "type": "color",
-          "id": "background",
-          "label": "Background"
+          "type": "range",
+          "id": "heading_fs_desktop_custom",
+          "label": "Heading size – Desktop (this slide)",
+          "min": 12,
+          "max": 160,
+          "step": 2,
+          "unit": "px",
+          "default": 72
         },
-        {
-          "type": "color_background",
-          "id": "background_gradient",
-          "label": "Background gradient"
-        }
+        { "type": "text", "id": "button_text", "label": "Button text" },
+        { "type": "url", "id": "button_link", "label": "Button link", "info": "Leave the button text empty to make the slide fully clickable." },
+        { "type": "header", "content": "Slide colors" },
+        { "type": "color", "id": "text_color", "label": "Text", "default": "#ffffff" },
+        { "type": "color", "id": "button_background", "label": "Button background", "default": "#ffffff" },
+        { "type": "color", "id": "button_text_color", "label": "Button text", "default": "#000000" },
+        { "type": "color", "id": "overlay_color", "label": "Overlay", "default": "#000000" },
+        { "type": "range", "id": "overlay_opacity", "label": "Overlay opacity", "min": 0, "max": 100, "step": 1, "unit": "%", "default": 30 },
+        { "type": "header", "content": "Background", "info": "Disable the \"Full width\" setting at the slideshow level to show background." },
+        { "type": "color", "id": "background", "label": "Background" },
+        { "type": "color_background", "id": "background_gradient", "label": "Background gradient" }
       ]
     },
     {
       "type": "video",
       "name": "Video",
       "settings": [
-        {
-          "type": "paragraph",
-          "content": "Video are muted to allow autoplay. For best results, do not add any content on top of the video when autoplay is enabled."
-        },
-        {
-          "type": "video",
-          "id": "video",
-          "label": "Video"
-        },
-        {
-          "type": "video",
-          "id": "mobile_video",
-          "label": "Mobile video",
-          "info": "Default to main video if none is set."
-        },
-        {
-          "type": "header",
-          "content": "Content"
-        },
-        {
-          "type": "range",
-          "id": "content_max_width",
-          "label": "Content maximum width",
-          "min": 400,
-          "max": 1200,
-          "step": 20,
-          "unit": "px",
-          "default": 780
-        },
+        { "type": "paragraph", "content": "Video are muted to allow autoplay. For best results, do not add any content on top of the video when autoplay is enabled." },
+        { "type": "video", "id": "video", "label": "Video" },
+        { "type": "video", "id": "mobile_video", "label": "Mobile video", "info": "Default to main video if none is set." },
+        { "type": "header", "content": "Content" },
+        { "type": "range", "id": "content_max_width", "label": "Content maximum width", "min": 400, "max": 1200, "step": 20, "unit": "px", "default": 780 },
         {
           "type": "select",
           "id": "mobile_text_position",
           "label": "Mobile content position",
           "options": [
-            {
-              "value": "place-self-start text-start",
-              "label": "Top left"
-            },
-            {
-              "value": "place-self-start-center text-center",
-              "label": "Top center"
-            },
-            {
-              "value": "place-self-start-end text-end",
-              "label": "Top right"
-            },
-            {
-              "value": "place-self-center-start text-start",
-              "label": "Middle left"
-            },
-            {
-              "value": "place-self-center text-center",
-              "label": "Middle center"
-            },
-            {
-              "value": "place-self-center-end text-end",
-              "label": "Middle right"
-            },
-            {
-              "value": "place-self-end-start text-start",
-              "label": "Bottom left"
-            },
-            {
-              "value": "place-self-end-center text-center",
-              "label": "Bottom center"
-            }
+            { "value": "place-self-start text-start", "label": "Top left" },
+            { "value": "place-self-start-center text-center", "label": "Top center" },
+            { "value": "place-self-start-end text-end", "label": "Top right" },
+            { "value": "place-self-center-start text-start", "label": "Middle left" },
+            { "value": "place-self-center text-center", "label": "Middle center" },
+            { "value": "place-self-center-end text-end", "label": "Middle right" },
+            { "value": "place-self-end-start text-start", "label": "Bottom left" },
+            { "value": "place-self-end-center text-center", "label": "Bottom center" }
           ],
           "default": "place-self-center text-center"
         },
@@ -628,153 +495,85 @@ LIQUID
           "id": "desktop_text_position",
           "label": "Desktop content position",
           "options": [
-            {
-              "value": "sm:place-self-start sm:text-start",
-              "label": "Top left"
-            },
-            {
-              "value": "sm:place-self-start-center sm:text-center",
-              "label": "Top center"
-            },
-            {
-              "value": "sm:place-self-start-end sm:text-end",
-              "label": "Top right"
-            },
-            {
-              "value": "sm:place-self-center-start sm:text-start",
-              "label": "Middle left"
-            },
-            {
-              "value": "sm:place-self-center sm:text-center",
-              "label": "Middle center"
-            },
-            {
-              "value": "sm:place-self-center-end sm:text-end",
-              "label": "Middle right"
-            },
-            {
-              "value": "sm:place-self-end-start sm:text-start",
-              "label": "Bottom left"
-            },
-            {
-              "value": "sm:place-self-end-center sm:text-center",
-              "label": "Bottom center"
-            }
+            { "value": "sm:place-self-start sm:text-start", "label": "Top left" },
+            { "value": "sm:place-self-start-center sm:text-center", "label": "Top center" },
+            { "value": "sm:place-self-start-end sm:text-end", "label": "Top right" },
+            { "value": "sm:place-self-center-start sm:text-start", "label": "Middle left" },
+            { "value": "sm:place-self-center sm:text-center", "label": "Middle center" },
+            { "value": "sm:place-self-center-end sm:text-end", "label": "Middle right" },
+            { "value": "sm:place-self-end-start sm:text-start", "label": "Bottom left" },
+            { "value": "sm:place-self-end-center sm:text-center", "label": "Bottom center" }
           ],
           "default": "sm:place-self-center sm:text-center"
         },
-        {
-          "type": "text",
-          "id": "subheading",
-          "label": "Subheading",
-          "default": "Tell your story"
-        },
-        {
-          "type": "text",
-          "id": "title",
-          "label": "Heading",
-          "default": "Slide title"
-        },
+        { "type": "text", "id": "subheading", "label": "Subheading", "default": "Tell your story" },
+        { "type": "text", "id": "title", "label": "Heading", "default": "Slide title" },
         {
           "type": "select",
           "id": "heading_tag",
           "label": "Heading size",
           "options": [
-            {
-              "value": "h0",
-              "label": "XX-Large"
-            },
-            {
-              "value": "h1",
-              "label": "X-Large"
-            },
-            {
-              "value": "h2",
-              "label": "Large"
-            },
-            {
-              "value": "h3",
-              "label": "Medium"
-            },
-            {
-              "value": "h4",
-              "label": "Small"
-            },
-            {
-              "value": "h5",
-              "label": "X-Small"
-            },
-            {
-              "value": "h6",
-              "label": "XX-Small"
-            }
+            { "value": "h0", "label": "XX-Large" },
+            { "value": "h1", "label": "X-Large" },
+            { "value": "h2", "label": "Large" },
+            { "value": "h3", "label": "Medium" },
+            { "value": "h4", "label": "Small" },
+            { "value": "h5", "label": "X-Small" },
+            { "value": "h6", "label": "XX-Small" }
           ],
           "default": "h0"
         },
         {
-          "type": "text",
-          "id": "button_text",
-          "label": "Button text"
-        },
-        {
-          "type": "url",
-          "id": "button_link",
-          "label": "Button link",
-          "info": "Leave the button text empty to make the slide fully clickable."
-        },
-        {
           "type": "header",
-          "content": "Slide colors"
+          "content": "Custom heading sizes (this slide)"
         },
         {
-          "type": "color",
-          "id": "text_color",
-          "label": "Text",
-          "default": "#ffffff"
-        },
-        {
-          "type": "color",
-          "id": "button_background",
-          "label": "Button background",
-          "default": "#ffffff"
-        },
-        {
-          "type": "color",
-          "id": "button_text_color",
-          "label": "Button text",
-          "default": "#000000"
-        },
-        {
-          "type": "color",
-          "id": "overlay_color",
-          "label": "Overlay",
-          "default": "#000000"
+          "type": "checkbox",
+          "id": "override_heading_sizes",
+          "label": "Use custom heading sizes for this slide",
+          "default": false
         },
         {
           "type": "range",
-          "id": "overlay_opacity",
-          "label": "Overlay opacity",
-          "min": 0,
-          "max": 100,
+          "id": "heading_fs_mobile_custom",
+          "label": "Heading size – Mobile (this slide)",
+          "min": 12,
+          "max": 96,
           "step": 1,
-          "unit": "%",
-          "default": 30
+          "unit": "px",
+          "default": 40
         },
         {
-          "type": "header",
-          "content": "Background",
-          "info": "Disable the \"Full width\" setting at the slideshow level to show background."
+          "type": "range",
+          "id": "heading_fs_tablet_custom",
+          "label": "Heading size – Tablet (this slide)",
+          "min": 12,
+          "max": 120,
+          "step": 2,
+          "unit": "px",
+          "default": 56
         },
         {
-          "type": "color",
-          "id": "background",
-          "label": "Background"
+          "type": "range",
+          "id": "heading_fs_desktop_custom",
+          "label": "Heading size – Desktop (this slide)",
+          "min": 12,
+          "max": 160,
+          "step": 2,
+          "unit": "px",
+          "default": 72
         },
-        {
-          "type": "color_background",
-          "id": "background_gradient",
-          "label": "Background gradient"
-        }
+        { "type": "text", "id": "button_text", "label": "Button text" },
+        { "type": "url", "id": "button_link", "label": "Button link", "info": "Leave the button text empty to make the slide fully clickable." },
+        { "type": "header", "content": "Slide colors" },
+        { "type": "color", "id": "text_color", "label": "Text", "default": "#ffffff" },
+        { "type": "color", "id": "button_background", "label": "Button background", "default": "#ffffff" },
+        { "type": "color", "id": "button_text_color", "label": "Button text", "default": "#000000" },
+        { "type": "color", "id": "overlay_color", "label": "Overlay", "default": "#000000" },
+        { "type": "range", "id": "overlay_opacity", "label": "Overlay opacity", "min": 0, "max": 100, "step": 1, "unit": "%", "default": 30 },
+        { "type": "header", "content": "Background", "info": "Disable the \"Full width\" setting at the slideshow level to show background." },
+        { "type": "color", "id": "background", "label": "Background" },
+        { "type": "color_background", "id": "background_gradient", "label": "Background gradient" }
       ]
     }
   ],
@@ -782,20 +581,12 @@ LIQUID
     {
       "name": "Slideshow",
       "blocks": [
-        {
-          "type": "image",
-          "settings": {
-            "title": "Slide 1"
-          }
-        },
-        {
-          "type": "image",
-          "settings": {
-            "title": "Slide 2"
-          }
-        }
+        { "type": "image", "settings": { "title": "Slide 1" } },
+        { "type": "image", "settings": { "title": "Slide 2" } }
       ]
     }
   ]
 }
 {% endschema %}
+
+
