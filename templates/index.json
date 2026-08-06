@@ -201,7 +201,7 @@
           "type": "group_map",
           "settings": {
             "customer_tag": "Group A",
-            "sku_prefix": "WS-A_",
+            "sku_prefix": "WS-B_",
             "display_label": "Test Group 1"
           }
         }
