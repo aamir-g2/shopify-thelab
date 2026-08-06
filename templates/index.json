@@ -200,7 +200,7 @@
         "group_map_izP3AQ": {
           "type": "group_map",
           "settings": {
-            "customer_tag": "Group A",
+            "customer_tag": "GroupA",
             "sku_prefix": "WS-B_",
             "display_label": "Test Group 1"
           }
